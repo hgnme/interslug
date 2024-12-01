@@ -1,0 +1,25 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore virtual environment directory
+venv/
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore PJSIP build artifacts
+pjproject/
+
+# Ignore any log files
+*.log
+
+# Ignore IDE/editor files (optional)
+.vscode/
+.idea/
+
+# Ignore setup-related files
+*.swp
+

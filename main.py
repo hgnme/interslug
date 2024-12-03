@@ -12,12 +12,12 @@ def main():
     try:
         # udp.periodic_broadcast("Static packet content")
         threading.Thread(target=udp.receive, daemon=True).start()
-
+        threading.Thread(target=udp.periodic_dhcp, daemon=True).start()
+        udp.elevator_request()
         # sip.setup()
         # # Example direct interactions:
         # sip.make_call("user@192.168.1.100:5060")
         # sip.send_message("user@192.168.1.100:5060", "Hello from Raspberry Pi!")
-
         # Add logic for user input or triggers
         input("Press Enter to exit...\n")
     finally:

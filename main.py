@@ -1,29 +1,48 @@
 import threading
+from logging_config import get_logger
+
 from udp_handler import UDPHandler
-from sip_handler import SIPHandler
-# from config import SIP_USER, SIP_PASSWORD, SIP_SERVER
+from hgn_sip.sip_handler import SIPHandler
+from interslug.intercom_handler import IntercomSIPHandler
+
+from config import FAKE_ID
+
+main_logger = get_logger("main")
 
 def main():
-    print("hi")
-    udp = UDPHandler()
-    print("die")
-    ip_address = "192.168.67.98"
-    sip = SIPHandler(ip_address)
+    main_logger.info("Starting main thread")
+    bind_ip_address = "192.168.67.98"
+    bind_sip_port = 5060
+    main_logger.info(f"Creating SIPHandler. ip={bind_ip_address}, port={bind_sip_port}")
+
+    intercom_sip_handler = IntercomSIPHandler(bind_ip_address, bind_sip_port, FAKE_ID)
+
+    main_logger.info(f"Creating UDPHandler")
+    udp_handler = UDPHandler()
 
     try:
-        # udp.periodic_broadcast("Static packet content")
-        threading.Thread(target=udp.receive, daemon=True).start()
-        threading.Thread(target=udp.periodic_dhcp, daemon=True).start()
-        # udp.elevator_request()
-        # sip.setup()
-        # # Example direct interactions:
-        # sip.make_call("user@192.168.1.100:5060")
-        # sip.send_message("user@192.168.1.100:5060", "Hello from Raspberry Pi!")
-        # Add logic for user input or triggers
+        # Create SIP thread (which also registers the account)
+        main_logger.info(f"Starting thread for SIPHandler")
+        sip_thread = threading.Thread(target=intercom_sip_handler.run, name="thread-siphandler", daemon=True)
+        sip_thread.start()
+        # Create thread to process incoming packets
+        main_logger.info(f"Starting thread for UDPHandler.receive")
+        threading.Thread(target=udp_handler.receive, name="thread-udphandler-receive", daemon=True).start()
+        # Create thread to occasionally transmit DHCP packet
+        main_logger.info(f"Starting thread for UDPHandler.periodic_dhcp")
+        threading.Thread(target=udp_handler.periodic_dhcp, name="thread-udphandler-periodic_dhcp", daemon=True).start()
+
+        udp_handler.elevator_request(3, 6)
+        udp_handler.elevator_request(3, 7)
+        udp_handler.elevator_request(3, 8)
+        udp_handler.elevator_request(3, 9)
+        udp_handler.elevator_request(3, 10)
+        udp_handler.elevator_request(3, 11)
+        udp_handler.elevator_request(3, 12)
+
         input("Press Enter to exit...\n")
     finally:
-        udp.stop()
-        sip.stop()
-        # sip.shutdown()
+        udp_handler.stop()
+        intercom_sip_handler.stop()
 if __name__ == "__main__":
     main()

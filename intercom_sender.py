@@ -15,6 +15,8 @@ class GenericXML:
     def add_element(self, tag: str, parent: ET.Element = None): 
         target = parent if parent is not None else self.xml
         return ET.SubElement(target, tag)
+    def set_element_text(self, tag: str, text: str):
+        self.xml.find(tag).text = text
 
 class GenericEventXML(GenericXML):
     def __init__(self, event_activity: str, event_type: str):
@@ -49,19 +51,10 @@ class RespondToIDRequest:
 
     def send_it(self):
         send_packet(self.packet)
-
-class UnlockElevatorFloorRequest:
-    def __init__(self, building: int, floor: int, apt: int, socket: UdpStreamConfig):
-        self.logger = get_logger("elevator_request")
+class SearchRequest:
+    def __init__(self, socket: UdpStreamConfig):
         self.socket = socket
-        xml = GenericEventXML("broadcast_data", "req")
-        xml.add_element("broadcast_url").text = "elevaction"
-        elev_xml = xml.add_element("elev")
-        xml.add_element("to", elev_xml).text = "12"
-        xml.add_element("build", elev_xml).text = f"{building}"
-        xml.add_element("unit", elev_xml).text = "0"
-        xml.add_element("floor", elev_xml).text = f"{floor}"
-        xml.add_element("family", elev_xml).text = f"{apt}"
+        xml = GenericEventXML("search","req")
         self.packet = Packet( 
             source_ip = self.socket.self_ip, 
             source_port = self.socket.port, 
@@ -70,9 +63,46 @@ class UnlockElevatorFloorRequest:
             socket=socket,
             data=xml.to_string()
         )
-        self.logger.info(f"Created Elevator Unlock Request. body={self.packet.data}")
     def send_it(self):
         send_packet(self.packet)
+
+
+
+class UnlockElevatorFloorRequest:
+    def __init__(self, building: int, floor: int, apt: int, socket: UdpStreamConfig):
+        self.logger = get_logger("elevator_request")
+        self.socket = socket
+        self.packets:list[Packet] = []
+        xml = GenericEventXML("broadcast_data", "req")
+        xml.add_element("broadcast_url").text = "elevaction"
+        elev_xml = xml.add_element("elev")
+        xml.add_element("to", elev_xml).text = "12"
+        xml.add_element("build", elev_xml).text = f"{building}"
+        xml.add_element("unit", elev_xml).text = "1"
+        xml.add_element("floor", elev_xml).text = f"{floor}"
+        xml.add_element("family", elev_xml).text = f"{apt}"
+        self.packets.append(Packet( 
+            source_ip = self.socket.self_ip, 
+            source_port = self.socket.port, 
+            destination_ip = self.socket.ip, 
+            destination_port = self.socket.port,
+            socket=socket,
+            data=xml.to_string()
+        ))
+        xml.set_element_text("broadcast_url", "elev/wall/action")
+        self.packets.append(Packet( 
+            source_ip = self.socket.self_ip, 
+            source_port = self.socket.port, 
+            destination_ip = self.socket.ip, 
+            destination_port = self.socket.port,
+            socket=socket,
+            data=xml.to_string()
+        ))
+        
+        self.logger.info(f"Created Elevator Unlock Request. packets={self.packets}")
+    def send_it(self):
+        for packet in self.packets:
+            send_packet(packet)
 
 class DHCPBroadcast:
     def __init__(self, socket: UdpStreamConfig):

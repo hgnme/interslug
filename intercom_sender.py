@@ -78,7 +78,7 @@ class UnlockElevatorFloorRequest:
         elev_xml = xml.add_element("elev")
         xml.add_element("to", elev_xml).text = "12"
         xml.add_element("build", elev_xml).text = f"{building}"
-        xml.add_element("unit", elev_xml).text = "1"
+        xml.add_element("unit", elev_xml).text = "0"
         xml.add_element("floor", elev_xml).text = f"{floor}"
         xml.add_element("family", elev_xml).text = f"{apt}"
         self.packets.append(Packet( 

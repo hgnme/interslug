@@ -76,3 +76,6 @@ class IntercomSIPHandler():
         self.sip_handler.register_account(self.sip_identifier)
         self.sip_handler.account.onCallStateCallbacks = on_call_state_callbacks
         self.sip_handler.account.onInstantMessageCallbacks = on_im_status_callbacks
+
+    def stop(self):
+        self.sip_handler.stop()

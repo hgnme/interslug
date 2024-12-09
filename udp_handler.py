@@ -59,7 +59,11 @@ class UDPHandler:
             rlist = self.socket_manager.receive()
             for sock in rlist:
                 self.packet_counter += 1
-                data, addr = sock.recvfrom(1024)
+                try:
+                    data, addr = sock.recvfrom(1024)
+                except OSError as e:
+                    self.running = False
+                    return
                 source_ip = addr[0]
                 log_addr = "{0}:{1}".format(addr[0], addr[1])
 

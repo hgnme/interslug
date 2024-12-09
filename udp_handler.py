@@ -7,7 +7,7 @@ import netifaces
 from socket_manager import SocketManager
 from logging_config import get_logger
 from packet_handlers import PacketHandler, Packet
-from intercom_sender import DHCPBroadcast, UnlockElevatorFloorRequest
+from intercom_sender import DHCPBroadcast, UnlockElevatorFloorRequest, SearchRequest
 from config import UDP_CAST_CONFIGS, DHCP_PACKET_INTERVAL
 
 class UDPHandler:
@@ -37,10 +37,16 @@ class UDPHandler:
         obj = DHCPBroadcast(broadcast_socket)
         obj.send_it()
 
-    def elevator_request(self):
+    def elevator_request(self, building: int, floor: int):
         broadcast_socket = self.socket_manager.get_socket_by_name("intercom_reqs")
-        self.logger.info("Sending elevator request")
-        obj = UnlockElevatorFloorRequest(3, 3, 9, broadcast_socket)
+        self.logger.info(f"Sending elevator request. bldg={building} floor={floor}")
+        obj = UnlockElevatorFloorRequest(building, floor, 99, broadcast_socket)
+        obj.send_it()
+
+    def search_request(self):
+        broadcast_socket = self.socket_manager.get_socket_by_name("intercom_reqs")
+        self.logger.info("Sending Search request")
+        obj = SearchRequest(broadcast_socket)
         obj.send_it()
 
     def periodic_dhcp(self):
@@ -53,20 +59,19 @@ class UDPHandler:
             rlist = self.socket_manager.receive()
             for sock in rlist:
                 self.packet_counter += 1
-                data, addr = sock.recvfrom(4096)
+                data, addr = sock.recvfrom(1024)
                 source_ip = addr[0]
                 log_addr = "{0}:{1}".format(addr[0], addr[1])
 
                 receiving_socket_name = self.socket_manager.get_receiving_socket_name(sock).name
-                self.logger.info(f"({self.packet_counter}) Received packet from {log_addr} on from stream {receiving_socket_name}")
-                self.logger.debug(f"({self.packet_counter}) Contents {data}")
+                # self.logger.info(f"({self.packet_counter}) Received packet from {log_addr} on from stream {receiving_socket_name}")
+                # self.logger.debug(f"({self.packet_counter}) Contents {data}")
                 
                 message = data.decode('utf-8', errors='ignore')
                 if self.local_ip == source_ip:
                     self.logger.debug(f"({self.packet_counter}) ignoring packet sent by self")
                 elif self.is_ip_in_local_subnet(source_ip):
                     packet_manifest = Packet(addr[0], addr[1], message, self.socket_manager.get_socket_by_name(receiving_socket_name))
-                    self.logger.info(f"({self.packet_counter}) in-scope: Calling packet handler")
                     handler = PacketHandler(packet_manifest, self.packet_counter)
                     handler.handle_packet()
                 else:

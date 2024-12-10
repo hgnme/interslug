@@ -2,7 +2,8 @@ from flask import Flask, render_template_string, request
 from flask_socketio import SocketIO, emit
 from logging_config import get_logger
 from typing import TYPE_CHECKING
-from .intercom_handler import trigger_send_unlock_to_wallpanel, wall_panels
+from .intercom_handler import trigger_send_unlock_to_wallpanel
+from config import WALL_PANELS
 if TYPE_CHECKING:
     from udp_handler import UDPHandler
     from .intercom_handler import IntercomSIPHandler
@@ -15,7 +16,7 @@ class WebInterface:
         self.logger = get_logger("web-interface")
         self.app = Flask(__name__)
         self.socketio = SocketIO(self.app)
-        self.wall_panels = wall_panels
+        self.wall_panels = WALL_PANELS
         self._setup_routes()
         self._setup_socket_events()
 

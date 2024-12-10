@@ -55,19 +55,22 @@ class SIPCall(pj.Call):
             self.logger.debug("Call disconnected")
             self.acc.delete_call(self.call_id)
         
+        # Execute all callbacks based on their StateText
         for cb in self.onCallStateCallBacks:
             if ci.stateText == cb.on_state_text:
                 cb.execute(call = self, call_info = ci)
         
+    # How the fk does Media Work in this
     def onCallMediaState(self, prm: pj.OnCallMediaStateParam):
         self.logger.info("on call media state")
         ci: pj.CallInfo = self.getInfo()
         mi: pj.CallMediaInfo = ci.media
 
-
+    # Dont think sending IMs in calls is even a thing?
     def onInstantMessageStatus(self, param: pj.OnInstantMessageStatusParam):
         self.logger.info(f"onInstantMessageStatusCall: code={param.code}, reason={param.reason}")
 
+    # Same here. Can delete
     def onInstantMessage(self, param: pj.OnInstantMessageParam):
         contactUri = param.contactUri
         contentType = param.contentType

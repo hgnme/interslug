@@ -4,14 +4,11 @@ from .sip_buddy import SIPBuddy
 from .sip_call import SIPCall, get_call_param
 from .sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback
 
-def dumb_cb(call_info: pj.CallInfo):
-    logger = get_logger("call-callback")
-    logger.debug(f"Callback triggered. callIdString={call_info.callIdString}, stateText={call_info.stateText}, uri={call_info.remoteUri}")
-
 class SIPAccount(pj.Account):
     def __init__(self, ep):
         super().__init__()
         self.logger = get_logger("sip_account")
+        # Maintain list of Call/Buddies otherwise they'll get munched by GC and drop
         self.calls:list[SIPCall] = []
         self.buddies:list[SIPBuddy] = []
         self.ep = ep
@@ -37,7 +34,7 @@ class SIPAccount(pj.Account):
         self.logger.info(f"no buddy match. remote_uri={remote_uri}")
         return None
     
-    # Register buddy for a given URI. This will then allow us to send it an IM during a call, etc.
+    # Register buddy for a given URI. This will then allow us to send it an IM, etc.
     def create_buddy(self, remote_uri):
         self.logger.info(f"creating buddy. remote_uri={remote_uri}")
         buddy_cfg = pj.BuddyConfig()
@@ -47,7 +44,7 @@ class SIPAccount(pj.Account):
         self.buddies.append(buddy)
         return buddy
 
-    # Get a buddy if exists
+    # Return buddy by URI if exist
     def find_buddy(self, remote_uri):
         self.logger.info(f"searching for buddy. remote_uri={remote_uri}")
         for buddy in self.buddies:
@@ -58,12 +55,14 @@ class SIPAccount(pj.Account):
         self.logger.info(f"no buddy match. remote_uri={remote_uri}")
         return None
     
+    # Return buddy if exist otherwise create and return
     def find_or_create_buddy(self, remote_uri) -> SIPBuddy:
         buddy: SIPBuddy = self.find_buddy(remote_uri)
         if buddy is None:
             buddy = self.create_buddy(remote_uri)
         return buddy
     
+    # Called when the Endpoint is being destroyed. End all calls and unregister all buddies, then call shutdown on SIPAccount
     def destroy(self):
         ai: pj.AccountInfo = self.getInfo()
         self.logger.info(f"Destroying SIPAccount. uri={ai.uri}")

@@ -12,11 +12,15 @@ class SocketManager:
     def _setup_socket(self, socket_config: UdpStreamConfig):
         # Generate a UDP socket object based on the provided config, which will contain:
         # {name: "xyz", "ip": "...", "port": 1234}
+        
+        # So many ANGRY UPPERCAST constants
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b'eth0')
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65535)  # Set to a higher value
         sock.bind((self.self_ip, socket_config.port))
+
+        # IGMP Register as listener for Multicast (255.255.255.255 is broadcast)
         if socket_config.ip != "255.255.255.255":
             # Only subscribe if the destination is not broadcast addr
             mreq = struct.pack("4s4s", socket.inet_aton("238.9.9.1"), socket.inet_aton("192.168.67.98"))

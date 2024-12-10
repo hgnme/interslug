@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from udp_handler import UDPHandler
     from .intercom_handler import IntercomSIPHandler
 
-
+# ChatGPT did all this
 class WebInterface:
     def __init__(self, udp_handler: 'UDPHandler', intercom_sip_handler: 'IntercomSIPHandler'):
         self.udp_handler = udp_handler
@@ -32,7 +32,7 @@ class WebInterface:
             message = None
             if action == "call_elevator":
                 self.logger.info("Call Elevator button pressed")
-                self.udp_handler.elevator_request(3, 6)  # Adjust parameters as needed
+                self.udp_handler.elevator_request(3, 4)  # Adjust parameters as needed
                 message = "Elevator request sent!"
             elif action == "trigger_intercom":
                 self.logger.info("Trigger Intercom button pressed")

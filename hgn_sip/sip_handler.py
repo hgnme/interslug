@@ -8,6 +8,7 @@ class SIPHandler:
         self.logger = get_logger("sip_handler")
         self.shutdown_flag = threading.Event()
 
+        # Binding IP:PORT for the SIP Endpoint
         self.bind_ip = bind_ip
         self.bind_port = bind_port
         self.account: SIPAccount = None
@@ -47,6 +48,7 @@ class SIPHandler:
         # Set to Null Audio Device so that the calls don't shit themselves. Ignore incoming audio, and transmit silence.
         adm: pj.AudDevManager = self.endpoint.audDevManager()
         adm.setNullDev()
+        # I have zero idea why this works but I can't just set the Devices to ID -99 which is what it does anyway
         self.logger.debug(f"getPlaybackDev={adm.getPlaybackDev()}")
         self.logger.debug(f"getCaptureDev={adm.getCaptureDev()}")
 

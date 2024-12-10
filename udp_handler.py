@@ -31,29 +31,35 @@ class UDPHandler:
         # Assuming self.local_ip and self.local_subnet are already set
         return (ip_address(source_ip) in self.local_network)
     
+    # Called by periodic (below) every (x (config)) seconds to shout out MAC address for our IP
+    # Why dont they just use ARP
     def dhcp_broadcast(self):
         broadcast_socket = self.socket_manager.get_socket_by_name("intercom_reqs")
         self.logger.info("Sending DHCP Broadcast")
         obj = DHCPBroadcast(broadcast_socket)
         obj.send_it()
 
+    # Unlock elevator for floor in building. No SIP Required. (won't open a door though)
     def elevator_request(self, building: int, floor: int):
         broadcast_socket = self.socket_manager.get_socket_by_name("intercom_reqs")
         self.logger.info(f"Sending elevator request. bldg={building} floor={floor}")
         obj = UnlockElevatorFloorRequest(building, floor, 99, broadcast_socket)
         obj.send_it()
 
+    # Service Discovery
     def search_request(self):
         broadcast_socket = self.socket_manager.get_socket_by_name("intercom_reqs")
         self.logger.info("Sending Search request")
         obj = SearchRequest(broadcast_socket)
         obj.send_it()
 
+    # See above
     def periodic_dhcp(self):
         while self.running:
             self.dhcp_broadcast()
             time.sleep(DHCP_PACKET_INTERVAL)
 
+    # Infinite Looping main thread for processing incoming UDP packets on all sockets (see Config)
     def receive(self):
         while self.running:
             rlist = self.socket_manager.receive()

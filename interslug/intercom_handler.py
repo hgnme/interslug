@@ -28,10 +28,15 @@ class WallPanel():
 # cbf
 wall_panels = WALL_PANELS
 
+# Return the Building number for a specific wallpanel, this will determine whether doors open or not (when calling unlock)
 def get_wall_panel_building(remote_uri: str):
     for panel in wall_panels:
         if panel.sip_uri == remote_uri:
             return panel.building
+
+# Callback which is triggered when a SIPCall is Connected
+# This will send a SIP MESSAGE to the RemoteURI (wallpanel prob) containing the Unlock XML
+# as though you had just pressed "Unlock" on the Intercom
 def cs_cb_send_unlock_on_connected(call: 'SIPCall', call_account: 'SIPAccount', call_info: 'CallInfo'):
     logger = get_logger("cs_cb_send_unlock_on_connected")
     logger.info("Callback has been triggered")
@@ -43,6 +48,9 @@ def cs_cb_send_unlock_on_connected(call: 'SIPCall', call_account: 'SIPAccount', 
     logger.debug(message_content)
     call_account.send_im_to_remote_uri(call_info.remoteUri, message_content)
 
+# When an IM is received by the RemoteURI, it'll return an acknowledgement, this runs when that is received
+# It doesn't matter though because the dumb panels say "200 OK" even if I send them garbage
+# The call ends as soon as response is received.
 def im_cb_check_if_message_accepted(im_status_param: 'OnInstantMessageStatusParam', sip_account: 'SIPAccount'):
     logger = get_logger("im_cb_check_if_message_accepted")
     resp_data: 'SipRxData' = im_status_param.rdata
@@ -56,6 +64,8 @@ def im_cb_check_if_message_accepted(im_status_param: 'OnInstantMessageStatusPara
             logger.info(f"match call found, hanging up.")
             origin_call.end_call()
 
+# Web Interface triggered event to unlock a specific panel. 
+# This will call the panel (auto answer), on answer the above unlock callback is ran, then the call is ended.
 def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
     logger = get_logger("trigger_send_unlock_to_wallpanel")
     dest_wall_panel: 'WallPanel' = None
@@ -64,16 +74,18 @@ def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
             logger.info(f"Destination panel found. ip={panel.ip}, name={panel.name}, sip_handle={panel.sip_handle}, sip_uri={panel.sip_uri}")
             dest_wall_panel = panel
     
-    sip_account.ep.libRegisterThread("web-thread")
+    sip_account.ep.libRegisterThread("web-thread") # ThreadSaFeTy
 
     new_call = SIPCall(acc=sip_account, callbacks=sip_account.onCallStateCallbacks)
     new_call.make_call(dest_wall_panel.sip_uri)
     sip_account.calls.append(new_call)
 
-
+# List of Callback methods to run, and their call State to run on.
+# These are attached to every call - incoming and outgoing.
 on_call_state_callbacks = [
     SIPCallStateCallback("CONFIRMED", cs_cb_send_unlock_on_connected)
 ]
+# Callbacks to run when an IM Delivery Status is received to SIPAccount
 on_im_status_callbacks = [
     SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
 ]

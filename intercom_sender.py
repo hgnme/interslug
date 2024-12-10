@@ -20,6 +20,8 @@ class GenericXML:
     def set_element_text(self, tag: str, text: str):
         self.xml.find(tag).text = text
 
+# Sent during a SIP call to the WallPanel which will then trigger the unlock on the relevant door.
+# Also unlock floor on elevator if applicable.
 class UnlockButtonPushXML(GenericXML):
     def __init__(self, building: int, floor: int):
         xml = GenericXML("params")
@@ -33,7 +35,7 @@ class UnlockButtonPushXML(GenericXML):
         xml.add_element("family").text = "99"
         self.xml = xml.xml
 
-
+# Generic Event skeleton which is basis for most Multicast messages
 class GenericEventXML(GenericXML):
     def __init__(self, event_activity: str, event_type: str):
         self.activity = event_activity
@@ -43,6 +45,8 @@ class GenericEventXML(GenericXML):
         xml.add_element("type").text = event_type
         self.xml = xml.xml
 
+# When a wallpanel dials an Apartment, this will respond with our SIP URI (if it's our address)
+# After the Response, a SIP call should appear almost immediately (managed by SIP_Handler thread)
 class RespondToIDRequest:
     def __init__(self, id: str, source_packet: Packet, start_sip=False):
         self.logger = get_logger("id_responder")
@@ -64,9 +68,11 @@ class RespondToIDRequest:
             socket=source_packet.socket,
             data=response_xml
         )
-
     def send_it(self):
         send_packet(self.packet)
+
+# Used for Service Discovery. All devices on the network (in subnet) will reply
+# to this with their MAC and SIP ID/URI
 class SearchRequest:
     def __init__(self, socket: UdpStreamConfig):
         self.socket = socket
@@ -82,8 +88,8 @@ class SearchRequest:
     def send_it(self):
         send_packet(self.packet)
 
-
-
+# Multicasting this on 238.9.9.1:8420 will cause the listening Elevator controllers
+# to unlock the specified floors. Unit must be zero, the Family is the "requesting" apartment number
 class UnlockElevatorFloorRequest:
     def __init__(self, building: int, floor: int, apt: int, socket: UdpStreamConfig):
         self.logger = get_logger("elevator_request")
@@ -105,6 +111,7 @@ class UnlockElevatorFloorRequest:
             socket=socket,
             data=xml.to_bytes()
         ))
+        # For some reason the Wallpanels transmit both of these URLs, I don't know if it's necessary
         xml.set_element_text("broadcast_url", "elev/wall/action")
         self.packets.append(Packet( 
             source_ip = self.socket.self_ip, 
@@ -120,6 +127,8 @@ class UnlockElevatorFloorRequest:
         for packet in self.packets:
             send_packet(packet)
 
+# Broadcast out MAC address because there's no Gateway/DHCP and the android tablets
+# do ARP dumb
 class DHCPBroadcast:
     def __init__(self, socket: UdpStreamConfig):
         self.logger = get_logger("dhcp_broadcaster")
@@ -142,6 +151,7 @@ class DHCPBroadcast:
     def send_it(self):
         send_packet(self.packet)
 
+# Send out packet innit bruv
 def send_packet(packet: Packet):
     logger = get_logger("packet_sender")
     logger.debug(f"Sending packet. body={packet.data} source_ip={packet.source_ip} source_port={packet.source_port} dest_ip={packet.destination_ip} dest_port={packet.destination_port}")

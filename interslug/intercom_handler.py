@@ -4,35 +4,13 @@ if TYPE_CHECKING:
     from hgn_sip.sip_handler import SIPHandler
 
 from pjsua2 import CallInfo, OnInstantMessageStatusParam, SipRxData
+from logging_config import get_logger
 from hgn_sip.sip_call import SIPCall
 from hgn_sip.sip_handler import SIPHandler
 from hgn_sip.sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback
-from logging_config import get_logger
 from intercom_sender import UnlockButtonPushXML
+from interslug.wall_panel import WallPanel, get_wall_panel_building
 from config import WALL_PANELS
-
-# Set up the intercom to listen on FAKEID@IP
-# Setup hooks to answer when call is answered, to send unlock message
-# call, call_account, call_info
-
-class WallPanel():
-    def __init__(self, ip: str, name: str, sip_handle: str, building: int):
-        self.ip = ip
-        self.name = name
-        self.sip_handle = sip_handle
-        self.building = building
-        self.sip_uri = f"sip:2{self.sip_handle}@{self.ip}:5060"
-    def get_sip_name(self):
-        return f"\"W-{self.sip_handle}\""
-
-# cbf
-wall_panels = WALL_PANELS
-
-# Return the Building number for a specific wallpanel, this will determine whether doors open or not (when calling unlock)
-def get_wall_panel_building(remote_uri: str):
-    for panel in wall_panels:
-        if panel.sip_uri == remote_uri:
-            return panel.building
 
 # Callback which is triggered when a SIPCall is Connected
 # This will send a SIP MESSAGE to the RemoteURI (wallpanel prob) containing the Unlock XML
@@ -41,7 +19,7 @@ def cs_cb_send_unlock_on_connected(call: 'SIPCall', call_account: 'SIPAccount', 
     logger = get_logger("cs_cb_send_unlock_on_connected")
     logger.info("Callback has been triggered")
 
-    building = get_wall_panel_building(call_info.remoteUri)
+    building = get_wall_panel_building(call_info.remoteUri, WALL_PANELS)
     floor = 4 if building == 3 else 12
     logger.info(f"RemoteURI={call_info.remoteUri}, building={building}, floor={floor}")
     message_content = UnlockButtonPushXML(building, floor).to_string()

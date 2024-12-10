@@ -1,48 +1,47 @@
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hgn_sip.sip_account import SIPAccount
-    from hgn_sip.sip_call import SIPCall
     from hgn_sip.sip_handler import SIPHandler
-    from hgn_sip.sip_buddy import SIPBuddy
 
-from pjsua2 import CallInfo, SendInstantMessageParam, Error, OnInstantMessageStatusParam, SipRxData
+from pjsua2 import CallInfo, OnInstantMessageStatusParam, SipRxData
+from hgn_sip.sip_call import SIPCall
 from hgn_sip.sip_handler import SIPHandler
 from hgn_sip.sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback
 from logging_config import get_logger
-
+from intercom_sender import UnlockButtonPushXML
+from config import WALL_PANELS
 
 # Set up the intercom to listen on FAKEID@IP
 # Setup hooks to answer when call is answered, to send unlock message
 # call, call_account, call_info
 
+class WallPanel():
+    def __init__(self, ip: str, name: str, sip_handle: str, building: int):
+        self.ip = ip
+        self.name = name
+        self.sip_handle = sip_handle
+        self.building = building
+        self.sip_uri = f"sip:2{self.sip_handle}@{self.ip}:5060"
+    def get_sip_name(self):
+        return f"\"W-{self.sip_handle}\""
+
+# cbf
+wall_panels = WALL_PANELS
+
+def get_wall_panel_building(remote_uri: str):
+    for panel in wall_panels:
+        if panel.sip_uri == remote_uri:
+            return panel.building
 def cs_cb_send_unlock_on_connected(call: 'SIPCall', call_account: 'SIPAccount', call_info: 'CallInfo'):
     logger = get_logger("cs_cb_send_unlock_on_connected")
     logger.info("Callback has been triggered")
-    unlock_message_content = """
-    <params>
-        <app>talk</app>
-        <event>unlock</event>
-        <event_url>/talk/unlock</event_url>
-        <host>3000410</host>
-        <build>3</build>
-        <unit>0</unit>
-        <floor>4</floor>
-        <family>99</family>
-    </params>"""
-    mp = SendInstantMessageParam()
-    mp.content = unlock_message_content
-    mp.contentType = "text/plain"
 
-    dest_buddy: SIPBuddy = call_account.find_buddy(call_info.remoteUri)
-
-    try: 
-        logger.info(f"Attempting to send buddy IM. remote_uri={call_info.remoteUri}")
-        dest_buddy.sendInstantMessage(mp)
-        logger.info(f"Message sent")
-    except Error as e:
-        logger.error(f"Failed to send message: {e}")
-
-    logger.info("Callback complete")
+    building = get_wall_panel_building(call_info.remoteUri)
+    floor = 4 if building == 3 else 12
+    logger.info(f"RemoteURI={call_info.remoteUri}, building={building}, floor={floor}")
+    message_content = UnlockButtonPushXML(building, floor).to_string()
+    logger.debug(message_content)
+    call_account.send_im_to_remote_uri(call_info.remoteUri, message_content)
 
 def im_cb_check_if_message_accepted(im_status_param: 'OnInstantMessageStatusParam', sip_account: 'SIPAccount'):
     logger = get_logger("im_cb_check_if_message_accepted")
@@ -56,6 +55,20 @@ def im_cb_check_if_message_accepted(im_status_param: 'OnInstantMessageStatusPara
         if origin_call is not None:
             logger.info(f"match call found, hanging up.")
             origin_call.end_call()
+
+def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
+    logger = get_logger("trigger_send_unlock_to_wallpanel")
+    dest_wall_panel: 'WallPanel' = None
+    for panel in wall_panels:
+        if panel.name == target_panel:
+            logger.info(f"Destination panel found. ip={panel.ip}, name={panel.name}, sip_handle={panel.sip_handle}, sip_uri={panel.sip_uri}")
+            dest_wall_panel = panel
+    
+    sip_account.ep.libRegisterThread("web-thread")
+
+    new_call = SIPCall(acc=sip_account, callbacks=sip_account.onCallStateCallbacks)
+    new_call.make_call(dest_wall_panel.sip_uri)
+    sip_account.calls.append(new_call)
 
 
 on_call_state_callbacks = [

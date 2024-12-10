@@ -1,0 +1,21 @@
+from logging import INFO, DEBUG, WARN, CRITICAL, ERROR
+from udp_stream_config import UdpStreamConfig
+from interslug.intercom_handler import WallPanel
+# Configuration for UDP communication
+DHCP_PACKET_INTERVAL = 180  # seconds
+FAKE_ID = "x"
+LOG_FILE_NAME = "logs/all_logs.log"
+LOG_LEVEL = DEBUG
+# SIP Configuration
+SIP_LOCAL_PORT = 5060  # Port where the SIP stack will listen
+
+UDP_CAST_CONFIGS = [
+    UdpStreamConfig("238.9.9.1", 8400, "intercom_reqs"),
+    UdpStreamConfig("238.9.9.1", 8320, "call_history_maybe"),
+    UdpStreamConfig("255.255.255.255", 8420, "broadcast")
+]
+
+WALL_PANELS = [
+    WallPanel("192.168.100.1", "WALLPANEL_01", "0001", 1),
+    WallPanel("192.168.100.2", "WALLPANEL_02", "0002", 1),
+]

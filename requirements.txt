@@ -1,3 +1,6 @@
 # pyaudio
 pjsua2
 netifaces
+flask
+flask-socketio 
+eventlet

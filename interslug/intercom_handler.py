@@ -47,7 +47,7 @@ def im_cb_check_if_message_accepted(im_status_param: 'OnInstantMessageStatusPara
 def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
     logger = get_logger("trigger_send_unlock_to_wallpanel")
     dest_wall_panel: 'WallPanel' = None
-    for panel in wall_panels:
+    for panel in WALL_PANELS:
         if panel.name == target_panel:
             logger.info(f"Destination panel found. ip={panel.ip}, name={panel.name}, sip_handle={panel.sip_handle}, sip_uri={panel.sip_uri}")
             dest_wall_panel = panel

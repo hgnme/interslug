@@ -9,7 +9,7 @@ def get_call_param(code:int) -> pj.CallOpParam:
     return ret
     
 class SIPCall(pj.Call):
-    def __init__(self, acc, call_id, callbacks: list[SIPCallStateCallback]):
+    def __init__(self, acc, call_id = pj.PJSUA_INVALID_ID, callbacks: list[SIPCallStateCallback] = []):
         # Init logger
         self.logger = get_logger("new-call")
         self.logger.info(f"Initialising new call. call_id={call_id}")
@@ -20,11 +20,20 @@ class SIPCall(pj.Call):
         self.msg_sent = False
         self.call_id = call_id
         self.onCallStateCallBacks = callbacks
+        self.is_outgoing = True if call_id == pj.PJSUA_INVALID_ID else False
     
     def end_call(self):
         self.logger.info("Hanging up call")
         self.hangup(get_call_param(pj.PJSIP_SC_REQUEST_TERMINATED))
     
+    def make_call(self, remote_uri):
+        cs = pj.CallSetting(True)
+        cs.audioCount = 1
+        cs.videoCount = 0
+        params = pj.CallOpParam(True)
+        params.opt = cs
+        self.makeCall(remote_uri, params)
+
     def onCallState(self, param: pj.OnCallStateParam):
         # When call state changes, this runs. Depending on the state, do different things.
         # param has nothing useful, so just get info straight away.
@@ -34,8 +43,8 @@ class SIPCall(pj.Call):
             # Incoming call, mark it as as Ringing
             self.logger.debug("Call incoming, marking as Ringing")
             self.answer(get_call_param(pj.PJSIP_SC_RINGING))
-        elif ci.stateText == "EARLY" and ci.lastReason == "Ringing":
-            # Call changed to Early, answering ("accepting")
+        elif ci.stateText == "EARLY" and ci.lastReason == "Ringing" and not self.is_outgoing:
+            # Call changed to Early, answering ("accepting") (only if it's not Incoming)
             self.logger.debug("Call ringing, marking as Accepted")
             self.answer(get_call_param(pj.PJSIP_SC_ACCEPTED))
         elif ci.stateText == "CONFIRMED" and ci.lastReason == "Accepted":
@@ -49,6 +58,12 @@ class SIPCall(pj.Call):
         for cb in self.onCallStateCallBacks:
             if ci.stateText == cb.on_state_text:
                 cb.execute(call = self, call_info = ci)
+        
+    def onCallMediaState(self, prm: pj.OnCallMediaStateParam):
+        self.logger.info("on call media state")
+        ci: pj.CallInfo = self.getInfo()
+        mi: pj.CallMediaInfo = ci.media
+
 
     def onInstantMessageStatus(self, param: pj.OnInstantMessageStatusParam):
         self.logger.info(f"onInstantMessageStatusCall: code={param.code}, reason={param.reason}")

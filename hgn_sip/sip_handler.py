@@ -44,6 +44,12 @@ class SIPHandler:
         self.logger.debug(f"Initialising Endpoint with EpConfig")
         self.endpoint.libInit(self.ep_config)
         
+        # Set to Null Audio Device so that the calls don't shit themselves. Ignore incoming audio, and transmit silence.
+        adm: pj.AudDevManager = self.endpoint.audDevManager()
+        adm.setNullDev()
+        self.logger.debug(f"getPlaybackDev={adm.getPlaybackDev()}")
+        self.logger.debug(f"getCaptureDev={adm.getCaptureDev()}")
+
         # Attach SIP/UDP Transport to Endpoint (with relevant config)
         self.logger.debug(f"Registering SIP/UDP Transport with TransportConfig")
         self.endpoint.transportCreate(pj.PJSIP_TRANSPORT_UDP, self.transport_config)
@@ -59,9 +65,9 @@ class SIPHandler:
         self.logger.debug(f"Registering Account. handle={sip_handle}")
         rtp_config = pj.TransportConfig()
         acc_config = pj.AccountConfig()
+        acc_nat_config = pj.AccountNatConfig()
         acc_media_config = pj.AccountMediaConfig()
         acc_sip_config = pj.AccountSipConfig()
-
         acc_config.idUri = f"sip:{sip_handle}@{self.bind_ip}:{self.bind_port}"
 
         # Set bind IP and Public IP to that of the handler
@@ -73,9 +79,14 @@ class SIPHandler:
         # Set contactForced to the idURI to prevent it being rewritten behind NAT.
         acc_sip_config.contactForced = acc_config.idUri
 
+        # Set Nat Config, disable STUN and Nat
+        acc_nat_config.sipStunUse = pj.PJSUA_STUN_USE_DISABLED
+        acc_nat_config.mediaStunUse = pj.PJSUA_STUN_USE_DISABLED
+
         # Attach Media and SipConfigs to the AccountConfig
         acc_config.mediaConfig = acc_media_config
         acc_config.sipConfig = acc_sip_config
+        acc_config.natConfig = acc_nat_config
         
         # Initialise account object and attach to the SIPHandler
         self.logger.info("Creating SIPAccount on Endpoint with Config")

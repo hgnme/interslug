@@ -4,6 +4,7 @@ from logging_config import get_logger
 from udp_handler import UDPHandler
 from hgn_sip.sip_handler import SIPHandler
 from interslug.intercom_handler import IntercomSIPHandler
+from interslug.web_interface import WebInterface
 
 from config import FAKE_ID
 
@@ -12,13 +13,18 @@ main_logger = get_logger("main")
 def main():
     main_logger.info("Starting main thread")
     bind_ip_address = "192.168.67.98"
+    ts_ip_address = "100.82.195.107"
     bind_sip_port = 5060
-    main_logger.info(f"Creating SIPHandler. ip={bind_ip_address}, port={bind_sip_port}")
 
+    main_logger.info(f"Creating SIPHandler. ip={bind_ip_address}, port={bind_sip_port}")
     intercom_sip_handler = IntercomSIPHandler(bind_ip_address, bind_sip_port, FAKE_ID)
 
     main_logger.info(f"Creating UDPHandler")
     udp_handler = UDPHandler()
+
+    main_logger.info(f"Creating WebInterface")
+    web_interface = WebInterface(udp_handler, intercom_sip_handler)
+
 
     try:
         # Create SIP thread (which also registers the account)
@@ -32,14 +38,9 @@ def main():
         main_logger.info(f"Starting thread for UDPHandler.periodic_dhcp")
         threading.Thread(target=udp_handler.periodic_dhcp, name="thread-udphandler-periodic_dhcp", daemon=True).start()
 
-        udp_handler.elevator_request(3, 6)
-        udp_handler.elevator_request(3, 7)
-        udp_handler.elevator_request(3, 8)
-        udp_handler.elevator_request(3, 9)
-        udp_handler.elevator_request(3, 10)
-        udp_handler.elevator_request(3, 11)
-        udp_handler.elevator_request(3, 12)
-
+        # Start Flask web listener
+        threading.Thread(target=web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
+        threading.Thread(target=web_interface.run, args=(ts_ip_address, 5000), name="thread-web-interface-ts", daemon=True).start()
         input("Press Enter to exit...\n")
     finally:
         udp_handler.stop()

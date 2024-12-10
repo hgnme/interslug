@@ -45,6 +45,7 @@ class SIPAccount(pj.Account):
         buddy = SIPBuddy(self)
         buddy.createBuddy(buddy_cfg)
         self.buddies.append(buddy)
+        return buddy
 
     # Get a buddy if exists
     def find_buddy(self, remote_uri):
@@ -56,6 +57,12 @@ class SIPAccount(pj.Account):
                 return buddy
         self.logger.info(f"no buddy match. remote_uri={remote_uri}")
         return None
+    
+    def find_or_create_buddy(self, remote_uri) -> SIPBuddy:
+        buddy: SIPBuddy = self.find_buddy(remote_uri)
+        if buddy is None:
+            buddy = self.create_buddy(remote_uri)
+        return buddy
     
     def destroy(self):
         ai: pj.AccountInfo = self.getInfo()
@@ -78,6 +85,21 @@ class SIPAccount(pj.Account):
         self.logger.info("Shutting down SIPAccount")
         self.shutdown()
     
+    # Function to send an IM to a target RemoteURI with specified message content
+    def send_im_to_remote_uri(self, remote_uri: str, message_body: str, content_type: str = "text/plain"):
+        # Find or create buddy
+        dest_buddy = self.find_or_create_buddy(remote_uri)
+        # Send message to buddy
+        mp = pj.SendInstantMessageParam()
+        mp.content = message_body
+        mp.contentType = content_type
+        try: 
+            self.logger.info(f"Attempting to send buddy IM. remote_uri={remote_uri}")
+            dest_buddy.sendInstantMessage(mp)
+            self.logger.info(f"Message sent")
+        except pj.Error as e:
+            self.logger.error(f"Failed to send message: {e}")
+
     # PJSUA2's onInstantMessage event. When an Instant Message is RECEIVED
     def onInstantMessage(self, param: pj.OnInstantMessageParam):
         contactUri = param.contactUri
@@ -99,8 +121,6 @@ class SIPAccount(pj.Account):
         self.logger.info(f"Account receiving incoming call. callid={param.callId}")
         call = SIPCall(self, call_id = param.callId, callbacks = self.onCallStateCallbacks)
         ci: pj.CallInfo = call.getInfo()
-        buddy: SIPBuddy = self.find_buddy(ci.remoteUri)
-        if buddy is None:
-            self.create_buddy(ci.remoteUri)
+        buddy = self.find_or_create_buddy(ci.remoteUri)
         self.logger.info(f"Incoming call detected and created. callId={param.callId}, remoteUri={ci.remoteUri}, accId={ci.accId}, callIdString={ci.callIdString}")
         self.calls.append(call)

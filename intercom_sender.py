@@ -10,13 +10,29 @@ class GenericXML:
     def __init__(self, tag: str):
         self.tag = tag
         self.xml = ET.Element(tag)
-    def to_string(self):
+    def to_string(self) -> str:
+        return ET.tostring(self.xml, encoding="unicode")
+    def to_bytes(self) -> str:
         return ET.tostring(self.xml, encoding="utf-8")
     def add_element(self, tag: str, parent: ET.Element = None): 
         target = parent if parent is not None else self.xml
         return ET.SubElement(target, tag)
     def set_element_text(self, tag: str, text: str):
         self.xml.find(tag).text = text
+
+class UnlockButtonPushXML(GenericXML):
+    def __init__(self, building: int, floor: int):
+        xml = GenericXML("params")
+        xml.add_element("active").text = "talk"
+        xml.add_element("event").text = "unlock"
+        xml.add_element("event_url").text = "/talk/unlock"
+        xml.add_element("host").text = "5555555"
+        xml.add_element("build").text = str(building)
+        xml.add_element("unit").text = "0"
+        xml.add_element("floor").text = str(floor)
+        xml.add_element("family").text = "99"
+        self.xml = xml.xml
+
 
 class GenericEventXML(GenericXML):
     def __init__(self, event_activity: str, event_type: str):
@@ -61,7 +77,7 @@ class SearchRequest:
             destination_ip = self.socket.ip, 
             destination_port = self.socket.port,
             socket=socket,
-            data=xml.to_string()
+            data=xml.to_bytes()
         )
     def send_it(self):
         send_packet(self.packet)
@@ -87,7 +103,7 @@ class UnlockElevatorFloorRequest:
             destination_ip = self.socket.ip, 
             destination_port = self.socket.port,
             socket=socket,
-            data=xml.to_string()
+            data=xml.to_bytes()
         ))
         xml.set_element_text("broadcast_url", "elev/wall/action")
         self.packets.append(Packet( 
@@ -96,7 +112,7 @@ class UnlockElevatorFloorRequest:
             destination_ip = self.socket.ip, 
             destination_port = self.socket.port,
             socket=socket,
-            data=xml.to_string()
+            data=xml.to_bytes()
         ))
         
         self.logger.info(f"Created Elevator Unlock Request. packets={self.packets}")
@@ -120,7 +136,7 @@ class DHCPBroadcast:
             destination_ip = self.socket.ip, 
             destination_port = self.socket.port,
             socket=socket,
-            data=xml.to_string()
+            data=xml.to_bytes()
         )
         self.logger.info(f"Created DHCP Broadcast. body={self.packet.data}")
     def send_it(self):

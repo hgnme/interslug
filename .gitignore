@@ -23,3 +23,5 @@ pjproject/
 # Ignore setup-related files
 *.swp
 
+# Ignore config file
+config.py

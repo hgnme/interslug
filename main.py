@@ -1,5 +1,6 @@
 import threading
 from logging_config import get_logger
+import requests 
 
 from udp_handler import UDPHandler
 from hgn_sip.sip_handler import SIPHandler
@@ -9,6 +10,16 @@ from interslug.web_interface import WebInterface
 from config import FAKE_ID
 
 main_logger = get_logger("main")
+
+def download_file(url, filename):
+    try:
+        main_logger.info(f"Starting download from {url}")
+        response = requests.get(url)
+        with open(filename, 'wb') as file:
+            file.write(response.content)
+        main_logger.info(f"File downloaded successfully: {filename}")
+    except Exception as e:
+        main_logger.error(f"Error downloading file: {e}")
 
 def main():
     main_logger.info("Starting main thread")
@@ -25,6 +36,9 @@ def main():
     main_logger.info(f"Creating WebInterface")
     web_interface = WebInterface(udp_handler, intercom_sip_handler)
 
+    download_url = 'http://ftp.iinet.net.au/pub/knoppix/KNOPPIX_V9.1CD-2021-01-25-EN.iso'
+    download_filename = 'KNOPPIX_V9.1CD-2021-01-25-EN.iso'
+    threading.Thread(target=download_file, args=(download_url, download_filename), daemon=True).start()
 
     try:
         # Create SIP thread (which also registers the account)

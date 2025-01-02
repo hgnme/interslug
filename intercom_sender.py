@@ -147,7 +147,7 @@ class DHCPBroadcast:
             socket=socket,
             data=xml.to_bytes()
         )
-        self.logger.info(f"Created DHCP Broadcast. body={self.packet.data}")
+        self.logger.debug(f"Created DHCP Broadcast. body={self.packet.data}")
     def send_it(self):
         send_packet(self.packet)
 

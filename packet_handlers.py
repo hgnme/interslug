@@ -57,12 +57,12 @@ class PacketHandler:
             self.logger.debug(f"({self.packet_id}) Packet Type is: {self.packet_type}")
 
     def process_sip_id_request(self):
-        self.logger.info(f"({self.packet_id}) Processing SIP ID request")
         fake_id = FAKE_ID
         request_id = self.get_xml_value_from_tag("id").text
+        self.logger.info(f"({self.packet_id}) Processing SIP ID request. request_id={request_id}")
         self.logger.debug(f"({self.packet_id}) Checking request ID {request_id} against fake ID {fake_id}")
         if request_id == fake_id:
-            self.logger.debug(f"({self.packet_id}) ID Match. Should now reply with our SIP address")
+            self.logger.info(f"({self.packet_id}) ID Match for FAKE_ID. Responding to request.")
             response = RespondToIDRequest(fake_id, self.packet)
             response.send_it()
     def decode_elevator_request(self):

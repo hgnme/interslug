@@ -3,9 +3,10 @@
 # call, call_account, call_info
 
 class WallPanel():
-    def __init__(self, ip: str, name: str, sip_handle: str, building: int):
+    def __init__(self, ip: str, name: str, sip_handle: str, building: int, label: str):
         self.ip = ip
         self.name = name
+        self.label = label
         self.sip_handle = sip_handle
         self.building = building
         self.sip_uri = f"sip:2{self.sip_handle}@{self.ip}:5060"

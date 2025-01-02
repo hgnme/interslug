@@ -69,10 +69,13 @@ class SIPAccount(pj.Account):
         self.logger.info("Ending active calls")
         for call in self.calls:
             # Check if call's not hungup and then hangup
-            ci: pj.CallInfo = call.getInfo()
-            if ci.stateText != "DISCONNECTED":
-                self.logger.info(f"Ending call. id={ci.callIdString}")
-                call.hangup(get_call_param(pj.PJSIP_SC_REQUEST_TERMINATED))
+            try:
+                ci: pj.CallInfo = call.getInfo()
+                if ci.stateText != "DISCONNECTED":
+                    self.logger.info(f"Ending call. id={ci.callIdString}")
+                    call.hangup(get_call_param(pj.PJSIP_SC_REQUEST_TERMINATED))
+            except pj.Error as e:
+                self.logger.error(f"Error ending call {call.call_id}. Error={e.reason}")                
             if call in self.calls:
                 self.calls.remove(call)
         self.logger.info("Unregistering Buddies")

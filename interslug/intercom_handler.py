@@ -11,6 +11,8 @@ from hgn_sip.sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusS
 from intercom_sender import UnlockButtonPushXML
 from interslug.wall_panel import WallPanel, get_wall_panel_building
 from config import WALL_PANELS
+from service_helper import stop_event
+import time 
 
 # Callback which is triggered when a SIPCall is Connected
 # This will send a SIP MESSAGE to the RemoteURI (wallpanel prob) containing the Unlock XML
@@ -20,7 +22,7 @@ def cs_cb_send_unlock_on_connected(call: 'SIPCall', call_account: 'SIPAccount', 
     logger.info("Callback has been triggered")
 
     building = get_wall_panel_building(call_info.remoteUri, WALL_PANELS)
-    floor = 4 if building == 3 else 12
+    floor = 4
     logger.info(f"RemoteURI={call_info.remoteUri}, building={building}, floor={floor}")
     message_content = UnlockButtonPushXML(building, floor).to_string()
     logger.debug(message_content)
@@ -79,6 +81,9 @@ class IntercomSIPHandler():
         self.sip_handler.register_account(self.sip_identifier)
         self.sip_handler.account.onCallStateCallbacks = on_call_state_callbacks
         self.sip_handler.account.onInstantMessageCallbacks = on_im_status_callbacks
+        while not stop_event.is_set():
+            time.sleep(1)
+        self.stop()
 
     def stop(self):
         self.sip_handler.stop()

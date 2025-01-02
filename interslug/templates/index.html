@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Panel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #444;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 18px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .intercom-button {
+            background-color: #4CAF50;
+        }
+        .elevator-button {
+            background-color: #2196F3;
+        }
+        .dropdown-container {
+            margin: 20px 0;
+            text-align: left;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #444;
+            transition: opacity 0.5s ease-out;
+        }
+    </style>
+    <script>
+        async function sendAction(action, destination = null) {
+            const response = await fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, destination })
+            });
+
+            const result = await response.json();
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = result.message || 'Action completed.';
+            messageElement.classList.remove('hidden');
+            
+            // Fade out and clear the message after 5 seconds
+            setTimeout(() => {
+                messageElement.classList.add('hidden');
+                setTimeout(() => {
+                    messageElement.textContent = '';
+                }, 500); // Wait for fade-out animation to complete
+            }, 5000);
+        }
+    </script>
+</head>
+<body>
+    <h1>Control Panel</h1>
+    <div class="container">
+        <!-- Simplified Pre-selected Buttons -->
+        <button class="intercom-button" onclick="sendAction('trigger_intercom', 'STANDALONE_HIGH_ST')">High St Entrance</button>
+        <button class="intercom-button" onclick="sendAction('trigger_intercom', 'B3_INTERNAL')">Ginko</button>
+        
+        <!-- Dropdown for Other Panels -->
+        <div class="dropdown-container">
+            <label for="destination">Other:</label>
+            <select id="destination">
+                {% for panel in panels %}
+                <option value="{{ panel.name }}">{{ panel.name }} ({{ panel.ip }})</option>
+                {% endfor %}
+            </select>            
+            <button class="intercom-button" onclick="sendAction('trigger_intercom', document.getElementById('destination').value)">
+                Trigger Intercom
+            </button>
+            <button class="elevator-button" onclick="sendAction('call_elevator', null)">Call Elevator</button>
+        </div>
+        <p id="message"></p>
+    </div>
+</body>
+</html>

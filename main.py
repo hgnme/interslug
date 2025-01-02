@@ -1,10 +1,11 @@
 import threading
+import signal
+import time
 from logging_config import get_logger
-
+from service_helper import stop_event
 from udp_handler import UDPHandler
-from hgn_sip.sip_handler import SIPHandler
 from interslug.intercom_handler import IntercomSIPHandler
-from interslug.web_interface import WebInterface
+from interslug.web_interface import WebInterface, WebInterfaceWrapper
 
 from config import FAKE_ID
 
@@ -24,6 +25,14 @@ def main():
 
     main_logger.info(f"Creating WebInterface")
     web_interface = WebInterface(udp_handler, intercom_sip_handler)
+    web_wrapper = WebInterfaceWrapper(web_interface)
+    def signal_handler(signum, frame):
+        main_logger.info(f"Signal received, stopping. signum={signum}")
+        stop_event.set()
+
+    # Setup to trigger signal_handler on SIGINT/TERM
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
 
     try:
@@ -39,10 +48,17 @@ def main():
         threading.Thread(target=udp_handler.periodic_dhcp, name="thread-udphandler-periodic_dhcp", daemon=True).start()
 
         # Start Flask web listener
-        threading.Thread(target=web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
-        threading.Thread(target=web_interface.run, args=(ts_ip_address, 5000), name="thread-web-interface-ts", daemon=True).start()
-        input("Press Enter to exit...\n")
+        web_wrapper.run("192.168.1.185", 5000)
+        web_wrapper.run(ts_ip_address, 5000)
+        # threading.Thread(target=web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
+        # threading.Thread(target=web_interface.run, args=(ts_ip_address, 5000), name="thread-web-interface-ts", daemon=True).start()
+        print("Running... Press Ctrl+C to interrupt")
+        while not stop_event.is_set():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        signal.raise_signal(signal.SIGINT)
     finally:
+        web_wrapper.stop()
         udp_handler.stop()
         intercom_sip_handler.stop()
 if __name__ == "__main__":

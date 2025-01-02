@@ -1,7 +1,7 @@
 from ipaddress import ip_address, ip_network
 import ipaddress
 import socket
-import threading
+from service_helper import stop_event
 import time
 import netifaces
 from socket_manager import SocketManager
@@ -52,16 +52,21 @@ class UDPHandler:
         self.logger.info("Sending Search request")
         obj = SearchRequest(broadcast_socket)
         obj.send_it()
-
+    
+    # Listen for stop event (prob sigterm/kill/int)
+    def is_still_running(self):
+        if stop_event.is_set():
+            self.stop()
+        return self.running
     # See above
     def periodic_dhcp(self):
-        while self.running:
+        while self.is_still_running():
             self.dhcp_broadcast()
             time.sleep(DHCP_PACKET_INTERVAL)
 
     # Infinite Looping main thread for processing incoming UDP packets on all sockets (see Config)
     def receive(self):
-        while self.running:
+        while self.is_still_running():
             rlist = self.socket_manager.receive()
             for sock in rlist:
                 self.packet_counter += 1
@@ -88,5 +93,6 @@ class UDPHandler:
                     self.logger.debug("out-of-scope: dropping")
     def stop(self):
         self.running = False
+        self.logger.info("Shutting down")
         for socket in self.socket_manager.sockets:
             socket.handle.close()

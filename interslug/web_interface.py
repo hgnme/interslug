@@ -1,12 +1,16 @@
+import asyncio
+import ssl
 import threading
+import websockets
 from flask import Flask, render_template, request, jsonify
 from logging_config import get_logger
 from service_helper import stop_event
 from typing import TYPE_CHECKING
 from .intercom_handler import trigger_send_unlock_to_wallpanel
-from config import WALL_PANELS
+from config import WALL_PANELS, HGN_SSL_CONTEXT
 from werkzeug.serving import make_server, BaseWSGIServer
 
+from .web_sip_bridge_rtc import run_main
 if TYPE_CHECKING:
     from udp_handler import UDPHandler
     from .intercom_handler import IntercomSIPHandler
@@ -27,6 +31,16 @@ class WebInterface:
         def control_panel_ui():
             # Pass wall panels to the template
             return render_template("index.html", panels=self.wall_panels)
+
+        @self.app.route("/wsui2", methods=["GET"])
+        def honkhonk_ws_ui_rtc():
+            # Pass wall panels to the template
+            return render_template("rtc2.html")
+        
+        @self.app.route("/wsui3", methods=["GET"])
+        def honkhonk_ws_ui_rtc_ipadmini():
+            # Pass wall panels to the template
+            return render_template("rtc3.html")
 
         @self.app.route("/api/list_panels", methods=["GET"])
         def handle_panels_list():
@@ -64,7 +78,7 @@ class WebInterface:
 
     def run(self, host: str, port: int):
         # Use a server that can be manually shut down
-        server = make_server(host, port, self.app)
+        server = make_server(host, port, self.app, ssl_context=HGN_SSL_CONTEXT)
         self.servers.append(server)
         # Start the server and block until shutdown
         self.logger.info(f"Starting Flask server on {host}:{port}")
@@ -72,19 +86,32 @@ class WebInterface:
     def shutdown_all(self):
         for server in self.servers:
             server.shutdown()
-        
+     
+def start_webrtc_srv():
+    logger = get_logger("start_webrtc_srv")
+    logger.debug("Calling run_main")
+    # This function is called in a separate thread
+    asyncio.run(run_main())
+
+
 class WebInterfaceWrapper:
     def __init__(self, web_interface: WebInterface):
         self.logger = get_logger("web-interface-wrapper")
         self.web_interface = web_interface
         self.threads: list[threading.Thread] = []
-# web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
     def run(self, host: str, port: int):
         self.logger.info(f"Starting webserver for ip={host}, port={port}")
         thread = threading.Thread(target=self._run_server, args=(host, port), daemon=True)
         thread.start()
         self.threads.append(thread)
 
+        self.logger.info(f"Starting websockets for ip={host} port={8765}")
+
+        # thread = threading.Thread(target=_start_server_thread, daemon=True)
+        thread = threading.Thread(target=start_webrtc_srv, daemon=True)
+        thread.start()
+        self.logger.info(f"Websockets Started")
+        self.threads.append(thread)
     def _run_server(self, host: str, port: int):
         self.web_interface.run(host=host, port=port)
 

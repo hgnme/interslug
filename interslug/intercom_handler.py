@@ -12,6 +12,8 @@ from intercom_sender import UnlockButtonPushXML
 from interslug.wall_panel import WallPanel, get_wall_panel_building
 from config import WALL_PANELS
 from service_helper import stop_event
+
+from .web_sip_bridge_rtc import sip_call_cb_notify_ws, attach_bridge_to_sip_call
 import time 
 
 # Callback which is triggered when a SIPCall is Connected
@@ -63,11 +65,15 @@ def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
 # List of Callback methods to run, and their call State to run on.
 # These are attached to every call - incoming and outgoing.
 on_call_state_callbacks = [
-    SIPCallStateCallback("CONFIRMED", cs_cb_send_unlock_on_connected)
+    # SIPCallStateCallback("CONFIRMED", cs_cb_send_unlock_on_connected)
+    SIPCallStateCallback("CONFIRMED", attach_bridge_to_sip_call),
+    SIPCallStateCallback("CONFIRMED", sip_call_cb_notify_ws),
+    SIPCallStateCallback("INCOMING", sip_call_cb_notify_ws),
+    SIPCallStateCallback("DISCONNECTED", sip_call_cb_notify_ws),
 ]
 # Callbacks to run when an IM Delivery Status is received to SIPAccount
 on_im_status_callbacks = [
-    SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
+    # SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
 ]
 
 

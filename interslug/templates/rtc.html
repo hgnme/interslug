@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Bridge</title>
+</head>
+<body>
+    <h1>Audio Bridge</h1>
+    <button id="connect">Start</button>
+    <button id="disconnect">Stop</button>
+
+    <script>
+        let socket = null;
+        let audioContext = null;
+        let audioQueue = [];
+        let micStream = null;
+
+        document.getElementById("connect").addEventListener("click", async () => {
+            socket = new WebSocket("wss://pi4b.localhost.direct:8765");
+            socket.binaryType = "arraybuffer";
+
+            audioContext = new AudioContext();
+            const scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+            // Playback SIP audio
+            scriptNode.onaudioprocess = (event) => {
+                if (audioQueue.length > 0) {
+                    const output = event.outputBuffer.getChannelData(0);
+                    const audioData = audioQueue.shift();
+                    for (let i = 0; i < audioData.length; i++) {
+                        output[i] = audioData[i] / 32767.0; // Normalize from Int16
+                    }
+                }
+            };
+            scriptNode.connect(audioContext.destination);
+
+            socket.onmessage = (event) => {
+                const int16Array = new Int16Array(event.data);
+                audioQueue.push(int16Array);
+            };
+
+            // Send mic audio to SIP
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const micSource = audioContext.createMediaStreamSource(micStream);
+            const micProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+            micProcessor.onaudioprocess = (event) => {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    const input = event.inputBuffer.getChannelData(0);
+                    const int16Array = new Int16Array(input.map(val => val * 32767));
+                    socket.send(int16Array.buffer);
+                }
+            };
+
+            micSource.connect(micProcessor);
+            micProcessor.connect(audioContext.destination);
+        });
+
+        document.getElementById("disconnect").addEventListener("click", () => {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+        });
+    </script>
+</body>
+</html>

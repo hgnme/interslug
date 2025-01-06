@@ -5,3 +5,7 @@ flask
 flask-socketio 
 eventlet
 #test 
+websockets
+aiohttp
+aiortc
+numpy

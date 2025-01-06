@@ -2,12 +2,27 @@ import pjsua2 as pj
 from logging_config import get_logger
 from .sip_buddy import SIPBuddy
 from .sip_callbacks import SIPCallStateCallback
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .sip_account import SIPAccount
 
 def get_call_param(code:int) -> pj.CallOpParam:
     ret = pj.CallOpParam()
     ret.statusCode = code
     return ret
+
+def get_call_media_status_string(code):
+    call_media_status_strings = ["PJSUA_CALL_MEDIA_NONE", "PJSUA_CALL_MEDIA_ACTIVE", "PJSUA_CALL_MEDIA_LOCAL_HOLD", "PJSUA_CALL_MEDIA_REMOTE_HOLD", "PJSUA_CALL_MEDIA_ERROR"]
+    return call_media_status_strings[code]
+
+def get_call_media_direction_string(code):
+    call_media_direction_strings = ["PJMEDIA_DIR_NONE", "PJMEDIA_DIR_ENCODING", "PJMEDIA_DIR_CAPTURE", "PJMEDIA_DIR_DECODING", "PJMEDIA_DIR_PLAYBACK", "PJMEDIA_DIR_RENDER", "PJMEDIA_DIR_ENCODING_DECODING", "PJMEDIA_DIR_CAPTURE_PLAYBACK", "PJMEDIA_DIR_CAPTURE_RENDER"]
+    return call_media_direction_strings[code]
     
+def get_call_media_type_string(code):
+    call_media_type_strings = ["PJMEDIA_TYPE_NONE", "PJMEDIA_TYPE_AUDIO", "PJMEDIA_TYPE_VIDEO", "PJMEDIA_TYPE_APPLICATION", "PJMEDIA_TYPE_UNKNOWN", ]
+    return call_media_type_strings[code]
+
 class SIPCall(pj.Call):
     def __init__(self, acc, call_id = pj.PJSUA_INVALID_ID, callbacks: list[SIPCallStateCallback] = []):
         # Init logger
@@ -15,16 +30,38 @@ class SIPCall(pj.Call):
         self.logger.info(f"Initialising new call. call_id={call_id}")
         # Init the PJSUA2 Call with the Account and Call ID provided from SIPAccount
         pj.Call.__init__(self, acc, call_id)
-        self.acc = acc
+        self.acc: SIPAccount = acc
         self.connected = False
         self.msg_sent = False
         self.call_id = call_id
         self.onCallStateCallBacks = callbacks
         self.is_outgoing = True if call_id == pj.PJSUA_INVALID_ID else False
-    
+        self.ports = []
     def end_call(self):
         self.logger.info("Hanging up call")
         self.hangup(get_call_param(pj.PJSIP_SC_REQUEST_TERMINATED))
+    
+    def dump_audio_media_details(self, am):
+        port_info: pj.ConfPortInfo = am.getPortInfo()
+        port_format: pj.MediaFormatAudio = port_info.format
+        self.logger.debug(f"port info. id={port_info.portId}, name={port_info.name}, txLevelAdj={port_info.txLevelAdj}, rxLevelAdj={port_info.rxLevelAdj}")
+        self.logger.debug(f"format info. clockRate={port_format.clockRate}, channelCount={port_format.channelCount}, frameTimeUsec={port_format.frameTimeUsec}, bitsPerSample={port_format.bitsPerSample}, type={port_format.type}")
+
+    def dump_audio_media_info(self):
+        ci: pj.CallInfo = self.getInfo()
+        call_media_info_list: list[pj.CallMediaInfo] = ci.media
+        for call_media_info in call_media_info_list:
+            self.logger.debug(f"media found type={call_media_info.type}, idx={call_media_info.index}, status={call_media_info.status}, direction={call_media_info.dir}, type_str={get_call_media_type_string(call_media_info.type)}, status_str={get_call_media_status_string(call_media_info.status)}, direction_str={get_call_media_direction_string(call_media_info.dir)}")
+            if call_media_info.type == pj.PJMEDIA_TYPE_AUDIO:
+                audio_media: pj.AudioMedia = self.getAudioMedia(call_media_info.index)
+                self.dump_audio_media_details(audio_media)
+    
+    def get_call_audio_media(self) -> pj.AudioMedia:
+        ci = self.getInfo()
+        cmil = ci.media
+        for cmi in cmil:
+            if cmi.type == pj.PJMEDIA_TYPE_AUDIO:
+                return self.getAudioMedia(cmi.index)
     
     def make_call(self, remote_uri):
         cs = pj.CallSetting(True)
@@ -52,6 +89,11 @@ class SIPCall(pj.Call):
             self.logger.debug("Call is now live.")
             self.connected = True    
         elif ci.stateText == "DISCONNECTED":
+            for port in self.ports:
+                try:
+                    port = None
+                except Exception as e:
+                    self.logger.error(f"Unable to detach custom port, error={e}")
             self.logger.debug("Call disconnected")
             self.acc.delete_call(self.call_id)
         

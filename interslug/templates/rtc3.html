@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Audio Stream</title>
+</head>
+<body>
+    <h1>WebRTC Audio Stream</h1>
+    <p id="status">Status: Disconnected</p>
+    <p id="details"></p>
+    <audio id="remoteAudio" autoplay controls></audio>
+    <div id="debug-info">
+        <h3>Incoming RTC Stream Debug:</h3>
+        <pre id="debug-text">Waiting for stream...</pre>
+    </div>
+    <div id="debug-console"></div>
+
+    <script>
+        // Create a function to log messages to the visible console
+        function debugLog(message) {
+            const consoleElement = document.getElementById('debug-console');
+            const logMessage = document.createElement('div');
+            logMessage.textContent = message;
+            consoleElement.appendChild(logMessage);
+            consoleElement.scrollTop = consoleElement.scrollHeight; // Scroll to the bottom
+        }
+
+        // Override console.log and console.error to use the visible console
+        const originalLog = console.log;
+        const originalError = console.error;
+        console.log = function(...args) {
+            debugLog('LOG: ' + args.join(' '));
+            originalLog.apply(console, args);
+        };
+        console.error = function(...args) {
+            debugLog('ERROR: ' + args.join(' '));
+            originalError.apply(console, args);
+        };
+
+        console.log("brain")
+    </script>
+    <script>
+        console.log("start")
+        const ws = new WebSocket("wss://pi4b.localhost.direct:8765");
+        const audioElement = document.getElementById("remoteAudio");
+        const statusElement = document.getElementById("status");
+        const detailsElement = document.getElementById("details");
+        let pc = new RTCPeerConnection();
+        let activeCall = false;
+        const debugText = document.getElementById('debug-text');
+        console.log("declarations done")
+        
+
+        // Log debug information
+        function logDebugInfo(message) {
+            debugText.textContent += message + '\n';
+        }
+
+        console.log("begin declare startCall")
+        async function startCall() { 
+            if (activeCall) {
+                console.log("Call is already active.");
+                return;
+            }
+
+            console.log("Starting the call...");
+
+            // Create a new RTCPeerConnection
+            pc = new RTCPeerConnection();
+
+             // Example: Add audio tracks to the peer connection (this can be from a media source or device)
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); // Change video to true if needed
+            stream.getTracks().forEach(track => {
+                pc.addTrack(track, stream);
+            });
+
+            // Set up event listeners for the connection
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Send the candidate to the signaling server
+                    console.log("ICE Candidate: ", event.candidate);
+                }
+            };
+
+            pc.ontrack = (event) => {
+                // Ensure it's an audio track
+                if (event.track.kind === 'audio') {
+                    logDebugInfo(`Received track: ${event.track.id}, kind: ${event.track.kind}`);
+                    logDebugInfo(`Track details: codec: ${event.track.kind}, state: ${event.track.readyState}`);
+
+                    // Attach the audio stream to the <audio> element
+                    audioElement.srcObject = event.streams[0];
+
+                    // Additional debug info
+                    logDebugInfo(`Track attached to <audio> element. Stream id: ${event.streams[0].id}`);
+                }
+            };
+
+            // Create the SDP offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            // Send the offer to the signaling server (not shown here, but you should send it via WebSocket)
+            console.log("Sending offer:", offer);
+            ws.send(JSON.stringify({
+                type: "offer",
+                sdp: offer.sdp
+            }));
+
+            // Set the activeCall flag to true
+            activeCall = true;
+        }
+        console.log("end declare startCall")
+        console.log("begin declare stopCall")
+        async function stopCall() {
+            if (!activeCall) {
+                console.log("No active call to stop.");
+                return;
+            }
+
+            console.log("Stopping the call...");
+            pc.removeTrack
+            // Close the peer connection and stop media streams
+
+            // Close senders
+            pc.getSenders().forEach(sender => {
+                sender.track.stop();
+            });
+            // Close receivers
+            pc.getReceivers().forEach(receiver => {
+                receiver.track.stop();
+            });
+
+            // Close the peer connection
+            pc.close();
+
+            // Set the activeCall flag to false
+            activeCall = false;
+
+            console.log("Call stopped.");
+        }
+        console.log("end declare stopCall")
+        console.log("declare ws.onmessage")
+        ws.onmessage = async (event) => {
+            const message = JSON.parse(event.data);
+            console.log(message)
+            detailsElement.innerText = event.data
+            if (message.type === "answer") {
+                /* This is a SDP answer from the server, in response to our Offer */
+                await pc.setRemoteDescription(new RTCSessionDescription(message));
+            } else if (message.event === "INCOMING") {
+                statusElement.innerText = "Status: Incoming Call";
+            } else if (message.event === "CONFIRMED") {
+                statusElement.innerText = "Status: Active Call";
+                startCall();
+            } else if (message.event === "DISCONNECTED") {
+                statusElement.innerText = "Status: Call disconnected";
+                stopCall();
+            }
+        };
+        
+        console.log("end declare ws.onmessage")
+    </script>
+</body>
+</html>

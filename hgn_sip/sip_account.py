@@ -11,7 +11,7 @@ class SIPAccount(pj.Account):
         # Maintain list of Call/Buddies otherwise they'll get munched by GC and drop
         self.calls:list[SIPCall] = []
         self.buddies:list[SIPBuddy] = []
-        self.ep = ep
+        self.ep: pj.Endpoint = ep
         self.onCallStateCallbacks: list[SIPCallStateCallback] = []
         self.onInstantMessageCallbacks: list[SIPInstantMessageStatusStateCallback] = []
         

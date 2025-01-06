@@ -47,10 +47,11 @@ class SIPHandler:
         
         # Set to Null Audio Device so that the calls don't shit themselves. Ignore incoming audio, and transmit silence.
         adm: pj.AudDevManager = self.endpoint.audDevManager()
+        aud_devs: list[pj.AudioDevInfo] = adm.enumDev2()
+        for dev_info in aud_devs:
+            self.logger.debug(f"Audio device: name={dev_info.name}, driver={dev_info.driver}, input_channels={dev_info.inputCount}, output_channels={dev_info.outputCount}")
+        self.logger.debug("Setting null audio dev")
         adm.setNullDev()
-        # I have zero idea why this works but I can't just set the Devices to ID -99 which is what it does anyway
-        self.logger.debug(f"getPlaybackDev={adm.getPlaybackDev()}")
-        self.logger.debug(f"getCaptureDev={adm.getCaptureDev()}")
 
         # Attach SIP/UDP Transport to Endpoint (with relevant config)
         self.logger.debug(f"Registering SIP/UDP Transport with TransportConfig")

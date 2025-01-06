@@ -16,6 +16,7 @@ pjproject/
 
 # Ignore any log files
 *.log
+*.log.*
 
 # Ignore IDE/editor files (optional)
 .vscode/

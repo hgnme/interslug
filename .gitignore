@@ -27,3 +27,7 @@ pjproject/
 
 # Ignore config file
 config.py
+
+# lmao keys
+*.key
+*.crt

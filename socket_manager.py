@@ -2,12 +2,13 @@ import select
 import socket 
 import struct
 from udp_stream_config import UdpStreamConfig
+from config import BIND_INTERFACE
 
 class SocketManager:
     def __init__(self, udp_casts: list[UdpStreamConfig]):
         self.self_ip = "0.0.0.0"
         self.sockets = [self._setup_socket(socket_config) for socket_config in udp_casts]
-        self.interface = "eth0"
+        self.interface = BIND_INTERFACE
 
     def _setup_socket(self, socket_config: UdpStreamConfig):
         # Generate a UDP socket object based on the provided config, which will contain:

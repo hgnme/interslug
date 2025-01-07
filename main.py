@@ -14,6 +14,7 @@ main_logger = get_logger("main")
 def main():
     main_logger.info("Starting main thread")
     bind_ip_address = "192.168.67.98"
+    bind_ip_address = "192.168.1.185"
     ts_ip_address = "100.82.195.107"
     bind_sip_port = 5060
 

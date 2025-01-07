@@ -22,6 +22,7 @@ class WebInterface:
         self.sip_handler = intercom_sip_handler.sip_handler
         self.logger = get_logger("web-interface")
         self.app = Flask(__name__, template_folder="templates")
+        self.app.debug = True
         self.wall_panels = WALL_PANELS
         self._setup_routes()
         self.servers: list[BaseWSGIServer] = []
@@ -32,10 +33,10 @@ class WebInterface:
             # Pass wall panels to the template
             return render_template("index.html", panels=self.wall_panels)
 
-        @self.app.route("/wsui2", methods=["GET"])
+        @self.app.route("/wsui", methods=["GET"])
         def honkhonk_ws_ui_rtc():
             # Pass wall panels to the template
-            return render_template("rtc2.html")
+            return render_template("rtc.html")
         
         @self.app.route("/wsui3", methods=["GET"])
         def honkhonk_ws_ui_rtc_ipadmini():

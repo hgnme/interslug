@@ -87,8 +87,13 @@ class SIPCall(pj.Call):
         elif ci.stateText == "CONFIRMED" and ci.lastReason == "Accepted":
             # Call is connected and live.
             self.logger.debug("Call is now live.")
-            self.connected = True    
-        elif ci.stateText == "DISCONNECTED":
+            self.connected = True
+        
+        # Execute all callbacks based on their StateText
+        for cb in self.onCallStateCallBacks:
+            if ci.stateText == cb.on_state_text:
+                cb.execute(call = self, call_info = ci)    
+        if ci.stateText == "DISCONNECTED":
             for port in self.ports:
                 try:
                     port = None
@@ -96,11 +101,6 @@ class SIPCall(pj.Call):
                     self.logger.error(f"Unable to detach custom port, error={e}")
             self.logger.debug("Call disconnected")
             self.acc.delete_call(self.call_id)
-        
-        # Execute all callbacks based on their StateText
-        for cb in self.onCallStateCallBacks:
-            if ci.stateText == cb.on_state_text:
-                cb.execute(call = self, call_info = ci)
         
     # How the fk does Media Work in this
     def onCallMediaState(self, prm: pj.OnCallMediaStateParam):

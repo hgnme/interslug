@@ -8,14 +8,14 @@ from socket_manager import SocketManager
 from logging_config import get_logger
 from packet_handlers import PacketHandler, Packet
 from intercom_sender import DHCPBroadcast, UnlockElevatorFloorRequest, SearchRequest
-from config import UDP_CAST_CONFIGS, DHCP_PACKET_INTERVAL
+from config import UDP_CAST_CONFIGS, DHCP_PACKET_INTERVAL, BIND_INTERFACE
 
 class UDPHandler:
     def __init__(self):
         # Initialize sockets using SocketManager
         self.logger = get_logger("udp_handler")
         self.socket_manager = SocketManager(UDP_CAST_CONFIGS)
-        self.local_ip, self.local_subnet = self.get_local_ip_and_subnet("eth0")
+        self.local_ip, self.local_subnet = self.get_local_ip_and_subnet(BIND_INTERFACE)
         self.logger.info(f"Creating UDPHandler for {self.local_ip} subnet {self.local_subnet}")
         self.local_network = ipaddress.IPv4Network(f"{self.local_ip}/{self.local_subnet}", strict=False)
         self.running = True

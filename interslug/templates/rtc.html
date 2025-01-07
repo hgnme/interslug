@@ -1,76 +1,119 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Bridge</title>
+    <title>Interslug</title>
+    <style>
+   /* General Styling */
+   body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #444;
+            margin-top: 20px;
+        }
+
+        p {
+            text-align: center;
+            font-size: 1.2em;
+        }
+
+        /* Audio Styling */
+        audio {
+            display: block;
+            margin: 20px auto;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+
+        /* Debug Info Styling */
+        #debug-info {
+            margin: 20px auto;
+            padding: 15px;
+            max-width: 600px;
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #debug-info h3 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        #debug-info pre {
+            background-color: #f7f7f7;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        /* Phone Buttons Styling */
+        .phone_buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px auto;
+        }
+        .phone_buttons-hidden {
+            display: none !important;
+        }
+
+        .phone_buttons button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #answer {
+            background-color: #4caf50; /* Green */
+        }
+
+        #answer:hover {
+            background-color: #45a049;
+        }
+
+        #decline {
+            background-color: #f44336; /* Red */
+        }
+
+        #decline:hover {
+            background-color: #e53935;
+        }
+    </style>
+    </style>
 </head>
 <body>
-    <h1>Audio Bridge</h1>
-    <button id="connect">Start</button>
-    <button id="disconnect">Stop</button>
-
-    <script>
-        let socket = null;
-        let audioContext = null;
-        let audioQueue = [];
-        let micStream = null;
-
-        document.getElementById("connect").addEventListener("click", async () => {
-            socket = new WebSocket("wss://pi4b.localhost.direct:8765");
-            socket.binaryType = "arraybuffer";
-
-            audioContext = new AudioContext();
-            const scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
-
-            // Playback SIP audio
-            scriptNode.onaudioprocess = (event) => {
-                if (audioQueue.length > 0) {
-                    const output = event.outputBuffer.getChannelData(0);
-                    const audioData = audioQueue.shift();
-                    for (let i = 0; i < audioData.length; i++) {
-                        output[i] = audioData[i] / 32767.0; // Normalize from Int16
-                    }
-                }
-            };
-            scriptNode.connect(audioContext.destination);
-
-            socket.onmessage = (event) => {
-                const int16Array = new Int16Array(event.data);
-                audioQueue.push(int16Array);
-            };
-
-            // Send mic audio to SIP
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const micSource = audioContext.createMediaStreamSource(micStream);
-            const micProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-
-            micProcessor.onaudioprocess = (event) => {
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    const input = event.inputBuffer.getChannelData(0);
-                    const int16Array = new Int16Array(input.map(val => val * 32767));
-                    socket.send(int16Array.buffer);
-                }
-            };
-
-            micSource.connect(micProcessor);
-            micProcessor.connect(audioContext.destination);
-        });
-
-        document.getElementById("disconnect").addEventListener("click", () => {
-            if (socket) {
-                socket.close();
-                socket = null;
-            }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-            }
-            if (micStream) {
-                micStream.getTracks().forEach(track => track.stop());
-                micStream = null;
-            }
-        });
-    </script>
+    <h1>Interslug</h1>
+    <p id="status">Status: Disconnected</p>
+    <p id="details"></p>
+    <audio id="remoteAudio" autoplay controls></audio>
+    <div class="phone_buttons phone_buttons-hidden" id="phone_buttons">
+        <button id="answer">answer</button>
+        <button id="decline">decline</button>
+    </div>
+    <div id="debug-info">
+        <h3>Incoming RTC Stream Debug:</h3>
+        <pre id="debug-text">Waiting for stream...</pre>
+    </div>
+    <script src="{{ url_for('static', filename='js/rtc.js') }}"></script>
 </body>
 </html>

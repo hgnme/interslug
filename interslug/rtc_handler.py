@@ -4,6 +4,7 @@ import json
 import uuid
 from websockets.asyncio.server import ServerConnection
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCDataChannel, MediaStreamTrack, AudioStreamTrack, RTCConfiguration, RTCIceCandidate
+from interslug.messages.message_builder import message_to_str
 from logging_config import get_logger
 
 @dataclass
@@ -13,15 +14,7 @@ class IncomingRTCIceCandidate():
     sdpMLineIndex: int
     usernameFragment: str
 
-def create_message_str(body, channel, callId:str = None):
-    obj = {
-        "channel": channel,
-        "message": body
-    }
-    if callId is not None:
-        obj["callId"] = callId
-    json_str = json.dumps(obj)
-    return json_str
+
 
 def component_str_to_int(component: str):
     if component == "rtp":
@@ -115,7 +108,7 @@ class RTCHandler():
         offer = await self.pc.createOffer()
         await self.pc.setLocalDescription(offer)
         ld = {"sdp": self.pc.localDescription.sdp, "type": "offer"}
-        await self.ws_connection.send(create_message_str(ld, "rtc"))
+        await self.ws_connection.send(message_to_str(ld, "rtc"))
         return ld
     
     async def update_remote_description(self, message):
@@ -139,5 +132,5 @@ class RTCHandler():
         for sender in senders:
             await sender.stop()
         res = await self.update_local_description()
-        await self.ws_connection.send(create_message_str(res, "rtc"))
+        await self.ws_connection.send(message_to_str(res, "rtc"))
         return True

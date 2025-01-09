@@ -4,7 +4,7 @@ import numpy as np
 import pjsua2 as pj
 import asyncio
 
-from aiortc import AudioStreamTrack
+from aiortc import MediaStreamTrack
 from av.audio.frame import AudioFrame
 
 from hgn_sip.sip_media import get_audio_format
@@ -37,7 +37,10 @@ class SIPAudioBridge(pj.AudioMediaPort):
         self.port_name = port_name
         self.format = audio_format
         super().createPort(port_name, audio_format)
-
+    def kill(self):
+        inf: pj.ConfPortInfo = self.getPortInfo()
+        self.__disown__
+    
     def onFrameReceived(self, frame: pj.MediaFrame):
         """Forward SIP audio to the browser."""
         audio_data = np.frombuffer(bytes(frame.buf), dtype=np.int16) # Convert PJSIP Buffer object to an NP array of signed 16b ints
@@ -50,20 +53,21 @@ class SIPAudioBridge(pj.AudioMediaPort):
             self.dropped_frames += 1
             pass
 
-class SIPToBrowserAudioTrack(AudioStreamTrack): 
+class SIPToBrowserAudioTrack(MediaStreamTrack): 
     """
         AudioStreamTrack for use with WebRTC. Takes frames from the queue and outputs them
         Timing must be maintained to maintain realtimeness.
         INPUT: Frames from SIP->Browser Queue
         OUTPUT: Frames to WebRTC
     """
-    def __init__(self, call_id: str):
+    kind = "audio"
+    def __init__(self, stream_queue_id: str):
         super().__init__()
-        self.call_id = call_id
+        self.stream_queue_id = stream_queue_id
         self.logger = get_logger(f'dummy-AudioStreamTrack[{self.id}]')
         self.format = get_audio_format()
         self.frametime_sec = self.format.frameTimeUsec * 0.000001
-        self.queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER),self.call_id)
+        self.queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER),stream_queue_id)
         self.total_frames = 0
         self.zero_frames = 0
         self.malformed_frames = 0
@@ -116,4 +120,5 @@ class SIPToBrowserAudioTrack(AudioStreamTrack):
         frame.pts = self._timestamp # Presentation Timestamp in time_base units
         frame.sample_rate = self.format.clockRate 
         frame.time_base = fractions.Fraction(1, self.format.clockRate) # Time base is 1/samplerathed of a second. e.g. 1/8000 = 0.000125s
+        # self.logger.debug(f"received frame. total={self.total_frames}, zero_frames={self.zero_frames}")
         return frame

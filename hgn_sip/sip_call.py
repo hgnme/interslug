@@ -1,7 +1,7 @@
 import pjsua2 as pj
 from logging_config import get_logger
 from .sip_buddy import SIPBuddy
-from .sip_callbacks import SIPCallStateCallback
+from .sip_callbacks import SIPCallCallback
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .sip_account import SIPAccount
@@ -24,9 +24,9 @@ def get_call_media_type_string(code):
     return call_media_type_strings[code]
 
 class SIPCall(pj.Call):
-    def __init__(self, acc, call_id = pj.PJSUA_INVALID_ID, callbacks: list[SIPCallStateCallback] = []):
+    def __init__(self, acc, call_id = pj.PJSUA_INVALID_ID, callbacks: list[SIPCallCallback] = []):
         # Init logger
-        self.logger = get_logger("new-call")
+        self.logger = get_logger("SIPCall")
         self.logger.info(f"Initialising new call. call_id={call_id}")
         # Init the PJSUA2 Call with the Account and Call ID provided from SIPAccount
         pj.Call.__init__(self, acc, call_id)
@@ -34,9 +34,25 @@ class SIPCall(pj.Call):
         self.connected = False
         self.msg_sent = False
         self.call_id = call_id
+        self.call_info: pj.CallInfo = None
         self.onCallStateCallBacks = callbacks
+        self.callbacks = callbacks
         self.is_outgoing = True if call_id == pj.PJSUA_INVALID_ID else False
         self.ports = []
+    
+    def emit(self, event:str):
+        self.logger.debug(f"CallEvent: event={event}")
+        ci = self.get_info()
+        self.logger.debug(f"CallEvent: after get info")
+        # Events: call_state, end_call
+        cbs = [cb for cb in self.callbacks if cb.event == event]
+        self.logger.debug(f"CallEvent: event={event}")
+        for cb in cbs:
+            if event == "call_state" and (cb.on_state_text == ci.stateText or cb.on_state_text == "ANY"):
+                cb.execute(call = self, call_info = ci)
+            if event == "end_call":
+                cb.execute(call = self, call_info = ci)
+
     def end_call(self):
         self.logger.info("Hanging up call")
         self.hangup(get_call_param(pj.PJSIP_SC_REQUEST_TERMINATED))
@@ -48,7 +64,7 @@ class SIPCall(pj.Call):
         self.logger.debug(f"format info. clockRate={port_format.clockRate}, channelCount={port_format.channelCount}, frameTimeUsec={port_format.frameTimeUsec}, bitsPerSample={port_format.bitsPerSample}, type={port_format.type}")
 
     def dump_audio_media_info(self):
-        ci: pj.CallInfo = self.getInfo()
+        ci: pj.CallInfo = self.get_info()
         call_media_info_list: list[pj.CallMediaInfo] = ci.media
         for call_media_info in call_media_info_list:
             self.logger.debug(f"media found type={call_media_info.type}, idx={call_media_info.index}, status={call_media_info.status}, direction={call_media_info.dir}, type_str={get_call_media_type_string(call_media_info.type)}, status_str={get_call_media_status_string(call_media_info.status)}, direction_str={get_call_media_direction_string(call_media_info.dir)}")
@@ -57,7 +73,7 @@ class SIPCall(pj.Call):
                 self.dump_audio_media_details(audio_media)
     
     def get_call_audio_media(self) -> pj.AudioMedia:
-        ci = self.getInfo()
+        ci = self.get_info()
         cmil = ci.media
         for cmi in cmil:
             if cmi.type == pj.PJMEDIA_TYPE_AUDIO:
@@ -71,10 +87,20 @@ class SIPCall(pj.Call):
         params.opt = cs
         self.makeCall(remote_uri, params)
 
+    def get_info(self) -> pj.CallInfo:
+        ci: pj.CallInfo = self.getInfo()
+        self.logger.debug(f"CallStateGet. state={ci.state} stateText={ci.stateText} lastReason={ci.lastReason} accId={ci.accId} callIdString={ci.callIdString} localUri={ci.localUri} remoteUri={ci.remoteUri} lastReason={ci.lastReason}")
+        self.call_info = ci
+        return ci
+
     def onCallState(self, param: pj.OnCallStateParam):
         # When call state changes, this runs. Depending on the state, do different things.
         # param has nothing useful, so just get info straight away.
-        ci: pj.CallInfo = self.getInfo()
+        ci = self.get_info()
+
+        # Trigger call_state callbacks
+        self.emit("call_state")
+
         self.logger.debug(f"Call state change. state={ci.state} stateText={ci.stateText} lastReason={ci.lastReason} accId={ci.accId} callIdString={ci.callIdString} localUri={ci.localUri} remoteUri={ci.remoteUri} lastReason={ci.lastReason}")
         if ci.stateText == "INCOMING":
             # Incoming call, mark it as as Ringing
@@ -88,11 +114,7 @@ class SIPCall(pj.Call):
             # Call is connected and live.
             self.logger.debug("Call is now live.")
             self.connected = True
-        
-        # Execute all callbacks based on their StateText
-        for cb in self.onCallStateCallBacks:
-            if ci.stateText == cb.on_state_text:
-                cb.execute(call = self, call_info = ci)    
+
         if ci.stateText == "DISCONNECTED":
             for port in self.ports:
                 try:
@@ -105,7 +127,7 @@ class SIPCall(pj.Call):
     # How the fk does Media Work in this
     def onCallMediaState(self, prm: pj.OnCallMediaStateParam):
         self.logger.info("on call media state")
-        ci: pj.CallInfo = self.getInfo()
+        ci: pj.CallInfo = self.get_info()
         mi: pj.CallMediaInfo = ci.media
 
     # Dont think sending IMs in calls is even a thing?

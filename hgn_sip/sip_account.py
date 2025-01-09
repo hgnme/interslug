@@ -2,7 +2,7 @@ import pjsua2 as pj
 from logging_config import get_logger
 from .sip_buddy import SIPBuddy
 from .sip_call import SIPCall, get_call_param
-from .sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback
+from .sip_callbacks import SIPCallCallback, SIPInstantMessageStatusStateCallback
 
 class SIPAccount(pj.Account):
     def __init__(self, ep):
@@ -12,7 +12,7 @@ class SIPAccount(pj.Account):
         self.calls:list[SIPCall] = []
         self.buddies:list[SIPBuddy] = []
         self.ep: pj.Endpoint = ep
-        self.onCallStateCallbacks: list[SIPCallStateCallback] = []
+        self.onCallCallbacks: list[SIPCallCallback] = []
         self.onInstantMessageCallbacks: list[SIPInstantMessageStatusStateCallback] = []
         
     # Delete call from stored list based on call_id.
@@ -121,7 +121,7 @@ class SIPAccount(pj.Account):
     # PJSUA2's OnIncomingCall event. This will create the Buddy and create the new Call object.
     def onIncomingCall(self, param: pj.OnIncomingCallParam):
         self.logger.info(f"Account receiving incoming call. callid={param.callId}")
-        call = SIPCall(self, call_id = param.callId, callbacks = self.onCallStateCallbacks)
+        call = SIPCall(self, call_id = param.callId, callbacks = self.onCallCallbacks)
         ci: pj.CallInfo = call.getInfo()
         buddy = self.find_or_create_buddy(ci.remoteUri)
         self.logger.info(f"Incoming call detected and created. callId={param.callId}, remoteUri={ci.remoteUri}, accId={ci.accId}, callIdString={ci.callIdString}")

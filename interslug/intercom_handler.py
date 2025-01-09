@@ -1,4 +1,6 @@
 from typing import TYPE_CHECKING
+
+from interslug.state.call_backs import cb_on_endcall_remove_from_call_manager, cs_cb_on_callstate_call_manager_update
 if TYPE_CHECKING:
     from hgn_sip.sip_account import SIPAccount
     from hgn_sip.sip_handler import SIPHandler
@@ -7,7 +9,7 @@ from pjsua2 import CallInfo, OnInstantMessageStatusParam, SipRxData
 from logging_config import get_logger
 from hgn_sip.sip_call import SIPCall
 from hgn_sip.sip_handler import SIPHandler
-from hgn_sip.sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback
+from hgn_sip.sip_callbacks import SIPCallStateCallback, SIPInstantMessageStatusStateCallback, SIPCallCallback
 from intercom_sender import UnlockButtonPushXML
 from interslug.wall_panel import WallPanel, get_wall_panel_building
 from config import WALL_PANELS
@@ -66,16 +68,24 @@ def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
 # These are attached to every call - incoming and outgoing.
 on_call_state_callbacks = [
     # SIPCallStateCallback("CONFIRMED", cs_cb_send_unlock_on_connected)
-    SIPCallStateCallback("CONFIRMED", attach_bridge_to_sip_call),
-    SIPCallStateCallback("CONFIRMED", sip_call_cb_notify_ws),
-    SIPCallStateCallback("INCOMING", sip_call_cb_notify_ws),
-    SIPCallStateCallback("DISCONNECTED", sip_call_cb_notify_ws),
+    # SIPCallStateCallback("CONFIRMED", attach_bridge_to_sip_call),
+    # SIPCallStateCallback("CONFIRMED", sip_call_cb_notify_ws),
+    # SIPCallStateCallback("INCOMING", sip_call_cb_notify_ws),
+    # SIPCallStateCallback("DISCONNECTED", sip_call_cb_notify_ws),
+    SIPCallStateCallback("ANY", cs_cb_on_callstate_call_manager_update)
 ]
+
 # Callbacks to run when an IM Delivery Status is received to SIPAccount
 on_im_status_callbacks = [
     # SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
 ]
+call_callbacks = [
+    SIPCallCallback("call_state", cs_cb_on_callstate_call_manager_update, on_state_text="ANY"),
+    SIPCallCallback("call_state", sip_call_cb_notify_ws, "ANY"),
+    SIPCallCallback("call_state", cb_on_endcall_remove_from_call_manager, on_state_text="DISCONNECTED"),
+    SIPCallCallback("end_call", cb_on_endcall_remove_from_call_manager)
 
+]
 
 class IntercomSIPHandler():
     def __init__(self, bind_ip_address: str, bind_sip_port: int, sip_identifier: str):
@@ -85,8 +95,7 @@ class IntercomSIPHandler():
     def run(self):
         self.sip_handler.create_endpoint()
         self.sip_handler.register_account(self.sip_identifier)
-        self.sip_handler.account.onCallStateCallbacks = on_call_state_callbacks
-        self.sip_handler.account.onInstantMessageCallbacks = on_im_status_callbacks
+        self.sip_handler.account.onCallCallbacks = call_callbacks
         while not stop_event.is_set():
             time.sleep(1)
         self.stop()

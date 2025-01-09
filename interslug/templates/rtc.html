@@ -103,17 +103,12 @@
 </head>
 <body>
     <h1>Interslug</h1>
-    <p id="status">Status: Disconnected</p>
+    <p id="status">Status: <span id="callstatus">Nothing</span></p>
     <p id="details"></p>
-    <audio id="remoteAudio" autoplay controls></audio>
-    <div class="phone_buttons phone_buttons-hidden" id="phone_buttons">
-        <button id="answer">answer</button>
-        <button id="decline">decline</button>
-    </div>
     <div id="debug-info">
         <h3>Incoming RTC Stream Debug:</h3>
         <pre id="debug-text">Waiting for stream...</pre>
     </div>
-    <script src="{{ url_for('static', filename='js/rtc.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/rtc.js') }}"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import json
 import uuid
 from websockets.asyncio.server import ServerConnection
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCDataChannel, MediaStreamTrack, AudioStreamTrack, RTCConfiguration, RTCIceCandidate
+from interslug.media_cookery.bridges import SIPToBrowserAudioTrack
 from interslug.messages.message_builder import message_to_str
 from logging_config import get_logger
 
@@ -35,6 +36,8 @@ class RTCHandler():
         self.add_default_listeners()
         self.active_call_id: str = None
         self.ready_to_transmit = False
+        self.negotiation_needed = False
+        self.watch_negotiation = False
 
     async def on_track(self, track: MediaStreamTrack):
         self.logger.debug(f"Event Trigger [on_Track]. ")
@@ -49,16 +52,31 @@ class RTCHandler():
         new_state = self.pc.iceGatheringState
         self.logger.debug(f"Event Trigger [on_IceGatheringStateChange]. iceGatheringState={new_state}")
 
+    async def watch_for_negotiation(self):
+        while self.watch_negotiation: 
+            if self.negotiation_needed:
+                self.pc.emit("negotiationneeded")
+                self.negotiation_needed = False
+            await asyncio.sleep(0.1)
     async def on_connectionstatechange(self):
         new_state = self.pc.connectionState
+        self.watch_negotiation = False
         self.logger.debug(f"Event Trigger [on_ConnectionStateChange]. connectionState={new_state}")
         self.check_can_transmit()
+        if new_state == "connecting" or new_state == "connected" or new_state == "new":
+            self.logger.debug("enabling negotitation watch")
+            self.watch_negotiation = True
+            asyncio.create_task(self.watch_for_negotiation())
 
     async def on_signalingstatechange(self):
         new_state = self.pc.signalingState
         self.logger.debug(f"Event Trigger [on_SignalingStateChange]. signalingState={new_state}")
         self.check_can_transmit()
-    
+
+    async def on_negotiationneeded(self):
+        self.logger.debug(f"Event Trigger [on_NegotiationNeeded].")
+        await self.update_local_description()
+
     def add_default_listeners(self):
         async def on_track(track: MediaStreamTrack):
             await self.on_track(track)
@@ -72,8 +90,11 @@ class RTCHandler():
             await self.on_connectionstatechange()
         async def on_signalingstatechange():
             await self.on_signalingstatechange()
+        async def on_negotiationneeded():
+            await self.on_negotiationneeded()
         self.pc.add_listener("connectionstatechange", on_connectionstatechange)
         self.pc.add_listener("signalingstatechange", on_signalingstatechange)
+        self.pc.add_listener("negotiationneeded", on_negotiationneeded)
         self.pc.add_listener("datachannel", on_datachannel)
         self.pc.add_listener("track", on_track)
         self.pc.add_listener("icecandidate", on_icecandidate)
@@ -84,6 +105,7 @@ class RTCHandler():
         await self.pc.setRemoteDescription(RTCSessionDescription(message["sdp"], "offer"))
         self.logger.debug("Calling createAnswer()")
         answer = await self.pc.createAnswer()
+        self.pc.connectionState
         self.logger.debug("Calling setLocalDescription()")
         await self.pc.setLocalDescription(answer)
 
@@ -102,18 +124,20 @@ class RTCHandler():
         self.pc.addTrack(audio_track)
         self.logger.debug("Returning new offer/answer")
         await self.update_local_description()
-        
     
     async def update_local_description(self):
-        offer = await self.pc.createOffer()
-        await self.pc.setLocalDescription(offer)
-        ld = {"sdp": self.pc.localDescription.sdp, "type": "offer"}
-        await self.ws_connection.send(message_to_str(ld, "rtc"))
-        return ld
+        try:
+            offer = await self.pc.createOffer()
+            await self.pc.setLocalDescription(offer)
+            ld = {"sdp": self.pc.localDescription.sdp, "type": "offer"}
+            await self.ws_connection.send(message_to_str(ld, "rtc"))
+            self.negotiation_needed = False
+        except Exception as e:
+            self.logger.debug(e)
     
     async def update_remote_description(self, message):
         await self.pc.setRemoteDescription(RTCSessionDescription(message["sdp"], "answer"))
-    
+
     def check_can_transmit(self):
         senders = self.pc.getSenders()
         receivers = self.pc.getReceivers()
@@ -127,10 +151,12 @@ class RTCHandler():
             self.ready_to_transmit = False
         self.logger.debug(f"check_can_transmit: ready_to_transmit={self.ready_to_transmit}, senders={len(senders)}, receivers={len(receivers)}, connectionState={self.pc.connectionState}, signalingState={self.pc.signalingState}")
     
-    async def kill_audio_sender(self):
-        senders = [sender for sender in self.pc.getSenders() if sender.track and sender.track.call_id == self.active_call_id]
+    def kill_audio_sender(self):
+        self.logger.debug("killing audio senders")
+        senders = [sender for sender in self.pc.getSenders() if sender.track]
         for sender in senders:
-            await sender.stop()
-        res = await self.update_local_description()
-        await self.ws_connection.send(message_to_str(res, "rtc"))
-        return True
+            self.logger.debug(f"Replacing track in sender")
+            sender.track.stop()
+            sender.replaceTrack(None)
+        # Flag for renegotiation
+        self.negotiation_needed = True

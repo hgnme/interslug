@@ -15,6 +15,15 @@ class SIPCallStateCallback():
         call_account: 'SIPAccount' = call.acc
         self.callback_fn(call, call_account, call_info)
 
+class SIPCallCallback():
+    def __init__(self, event: str, cb_fn, on_state_text: str = None):
+        self.event = event
+        self.callback_fn = cb_fn
+        self.on_state_text = on_state_text
+    def execute(self, call: 'SIPCall', call_info: 'pj.CallInfo'):
+        call_account: 'SIPAccount' = call.acc
+        self.callback_fn(call, call_account, call_info)
+
 
 # Really I'll just use this to validate that the IM i send has been accepted in its response
 class SIPInstantMessageStatusStateCallback():

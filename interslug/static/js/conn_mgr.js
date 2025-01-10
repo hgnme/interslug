@@ -87,6 +87,21 @@ export class RTCHandler {
             this.players.push(audioPlayer)
         }
     }
+
+    async addMicrophone() {
+        try {
+            // Access the microphone
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Add each audio track to the RTCPeerConnection
+            stream.getAudioTracks().forEach(track => {
+                this.pc.addTrack(track, stream);
+            });
+            console.log("Microphone added to RTCPeerConnection");
+        } catch (error) {
+            console.error("Error accessing the microphone:", error);
+        }
+    }
     async initialise() {
         await this.sendOffer()
     }

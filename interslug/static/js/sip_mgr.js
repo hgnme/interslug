@@ -181,6 +181,8 @@ export class SIPHandler {
             self.buttons.disableButtons()
         })
         this.buttons.showPhoneButtons()
+        /* Add microphone */
+        this.rtc.addMicrophone()
     }
     onCallEndConfirmed() {
         this.buttons.deletThis()

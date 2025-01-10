@@ -8,7 +8,8 @@ from interslug.media_cookery.bridges import SIPAudioBridge, SIPToBrowserAudioTra
 from interslug.messages.message_builder import message_to_str
 from interslug.rtc_handler import RTCHandler
 from interslug.state.browser_state import BrowserState
-from interslug.state.call_state import CallState
+from interslug.state.call_state import CallState, get_sip_call_info
+from interslug.state.message_emitter import SocketMessenger, MessageChannel
 from logging_config import get_logger
 
 
@@ -25,6 +26,7 @@ class CallManager:
         self.lock = Lock()  # To ensure thread-safe operations
         self.logger = get_logger("CallManager")
         self.sip_endpoint: Endpoint = None
+        self.messenger = SocketMessenger(self)
         """
             a CallState has:
              - The SIPCall (sip_call)
@@ -44,6 +46,25 @@ class CallManager:
         if not self.sip_endpoint.libIsThreadRegistered():
             self.logger.debug(f"Registering thread in SIPEndpoint. thread_name={thread_name}")
             self.sip_endpoint.libRegisterThread(thread_name)
+
+    def get_call(self, call_id: str) -> CallState:
+        """ Get a CallState object by call_id"""
+        if call_id in self.calls:
+            return self.calls[call_id]
+    
+    def update_call_info(self, call_id: str, call_info: 'CallInfo'):
+        # Update the info in the CallState itself first
+        call = self.get_call(call_id)
+        call.update_call_info(call_info)
+
+        # Broadcast to all Websocket listeners
+        
+        data = asdict(get_sip_call_info(call.sip_call))
+        msg = {
+            "type": "on_call_status",
+            "call": data
+        }
+        self.messenger.queueMessageAll(MessageChannel.SIP, msg)
 
     # Add a new SIP call
     def add_call(self, call_id: str, sip_call: 'SIPCall') -> CallState:
@@ -67,10 +88,6 @@ class CallManager:
                     self.browser_leave_call(id)
                 call_state.terminate()  # Terminate audio port and tracks
 
-    # Get a CallState by ID
-    def get_call(self, call_id: str) -> CallState:
-        if call_id in self.calls:
-            return self.calls[call_id]
     
     # Add a new browser
     def add_browser(self, websocket_id: str, websocket: 'ServerConnection') -> BrowserState:
@@ -88,6 +105,7 @@ class CallManager:
             if websocket_id in self.browsers:
                 browser_state = self.browsers.pop(websocket_id)
                 self._handle_browser_leaving_call(browser_state)
+
     # Get a BrowserState by ID
     def get_browser(self, websocket_id: str) -> BrowserState:
         if websocket_id in self.browsers:
@@ -95,25 +113,11 @@ class CallManager:
         raise KeyError(websocket_id)
     
 
-    # Send a websocket message as either broadcast or specific target browser
-    async def send_ws_message(self, message_dict: dict, target_browser_id: str = None):
-        message_str = message_to_str(message_dict, "sip")
-        targets = self.browsers if target_browser_id is None else {target_browser_id: self.get_browser(target_browser_id)}
-
-        for browser_id in targets:
-            client = targets[browser_id].websocket
-            self.logger.debug(f"Sending notification to client remote_addr={client.remote_address}")
-            try:
-                await client.send(message_str)
-                self.logger.debug(f"sent")
-            except Exception as e:
-                self.logger.error(f"Error notifying client: {e}")
-
     # Add an RTCHandler to browser object
     def browser_add_rtc_handler(self, websocket_id:str, rtc_handler: RTCHandler):
         self.logger.debug(f"Adding RTC Handler to browser. websocket_id={websocket_id}")
         browser = self.get_browser(websocket_id)
-        browser.rtc_handler = rtc_handler
+        browser.assign_new_rtc_handler(rtc_handler)
     
     # Handle a browser joining a call
     async def browser_join_call(self, websocket_id: str, call_id: str) -> None:
@@ -152,11 +156,11 @@ class CallManager:
                 "type": "call_answered",
                 "call": asdict(self.get_call(call_id).get_call_info())
             }
-            await self.send_ws_message(msg, websocket_id)
+            self.messenger.queueMessage(browser_state, MessageChannel.SIP, msg)
 
 
     # Handle a browser leaving a call
-    async def browser_leave_call(self, websocket_id: str) -> None:
+    def browser_leave_call(self, websocket_id: str) -> None:
         self.logger.debug(f"Browser leaving call. websocket_id={websocket_id}")
         # Check Browser is in BrowserList
         if websocket_id not in self.browsers:
@@ -171,10 +175,9 @@ class CallManager:
         msg = {
             "type": "call_disconnected"
         }
-        await self.send_ws_message(msg, websocket_id)
+        self.messenger.queueMessage(browser_state, MessageChannel.SIP, msg)
 
-    async def send_browser_call_list(self, websocket_id: str) -> None:
-        self.logger.debug("Sharing CallStates with browser")
+    def send_browser_call_list(self, websocket_id: str) -> None:
         calls_obj = {}
         if self.sip_endpoint is not None:
             self.check_or_register_thread()
@@ -186,10 +189,9 @@ class CallManager:
             "calls": calls_obj,
             "type": "call_list"
         }
-        await self.send_ws_message(msg, websocket_id)
+        browser_state = self.browsers[websocket_id]
+        self.messenger.queueMessage(browser_state, MessageChannel.SIP, msg)
 
-
-        
     def _attach_audio_bridge_to_call(self, call_id):
 
         call = self.get_call(call_id)

@@ -15,7 +15,6 @@ from interslug.wall_panel import WallPanel, get_wall_panel_building
 from config import WALL_PANELS
 from service_helper import stop_event
 
-from .web_sip_bridge_rtc import sip_call_cb_notify_ws, attach_bridge_to_sip_call
 import time 
 
 # Callback which is triggered when a SIPCall is Connected
@@ -81,7 +80,7 @@ on_im_status_callbacks = [
 ]
 call_callbacks = [
     SIPCallCallback("call_state", cs_cb_on_callstate_call_manager_update, on_state_text="ANY"),
-    SIPCallCallback("call_state", sip_call_cb_notify_ws, "ANY"),
+    # SIPCallCallback("call_state", sip_call_cb_notify_ws, "ANY"),
     SIPCallCallback("call_state", cb_on_endcall_remove_from_call_manager, on_state_text="DISCONNECTED"),
     SIPCallCallback("end_call", cb_on_endcall_remove_from_call_manager)
 

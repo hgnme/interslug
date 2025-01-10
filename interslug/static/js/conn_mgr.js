@@ -30,12 +30,13 @@ export class RTCHandler {
 
     addDefaultListeners() {
         this.pc.addEventListener("icecandidate", ev => {
-            console.log("onicecandidate")
             this.onICECandidate(ev)
         })
         this.pc.addEventListener("track", ev => {
-            console.log("track")
             this.onTrack(ev)
+        })
+        this.pc.addEventListener("negotiationneeded", ev => {
+            this.onNegotiationNeeded(ev)
         })
     }
     onICECandidate(event) {
@@ -66,6 +67,11 @@ export class RTCHandler {
             sendMessage(this.socket, {type: "icecandidate",candidate: cd_obj}, "rtc")
         }
         
+    }
+    onNegotiationNeeded(event) {
+        console.log("onNegotiationNeeded", event)
+        /* Update Local Desc then send */
+        this.sendOffer()
     }
     onTrack(event) {
         console.log("onTrack", event)

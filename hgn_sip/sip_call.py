@@ -43,10 +43,8 @@ class SIPCall(pj.Call):
     def emit(self, event:str):
         self.logger.debug(f"CallEvent: event={event}")
         ci = self.get_info()
-        self.logger.debug(f"CallEvent: after get info")
         # Events: call_state, end_call
         cbs = [cb for cb in self.callbacks if cb.event == event]
-        self.logger.debug(f"CallEvent: event={event}")
         for cb in cbs:
             if event == "call_state" and (cb.on_state_text == ci.stateText or cb.on_state_text == "ANY"):
                 cb.execute(call = self, call_info = ci)
@@ -89,7 +87,6 @@ class SIPCall(pj.Call):
 
     def get_info(self) -> pj.CallInfo:
         ci: pj.CallInfo = self.getInfo()
-        self.logger.debug(f"CallStateGet. state={ci.state} stateText={ci.stateText} lastReason={ci.lastReason} accId={ci.accId} callIdString={ci.callIdString} localUri={ci.localUri} remoteUri={ci.remoteUri} lastReason={ci.lastReason}")
         self.call_info = ci
         return ci
 

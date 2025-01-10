@@ -122,25 +122,31 @@ class CallManager:
             if websocket_id not in self.browsers or call_id not in self.calls:
                 raise ValueError(f"Invalid WebSocket ID {websocket_id} or Call ID {call_id}.")
             
+            # Get Browser and Call
             browser_state = self.browsers[websocket_id]
             call_state = self.calls[call_id]
 
-            self.check_or_register_thread()
+            self.check_or_register_thread() # Make sure thread registed
             # Avoid duplicating browser
             if websocket_id in call_state.listeners:
                 return
 
             # Add browser to call listeners
             stream_queue_id = f"c-{call_id}_ws-{websocket_id}"
+
             # temporary till sort IDs
             stream_queue_id = call_id
-            audio_stream_track = SIPToBrowserAudioTrack(stream_queue_id)  # Create a new track
+
+            audio_stream_track = SIPToBrowserAudioTrack(stream_queue_id)  # Emit audio FROM queue TO browser
             call_state.listeners[websocket_id] = audio_stream_track
-            browser_state.current_call_id = call_id
-            await self._register_audio_track_to_rtc(websocket_id, audio_stream_track)
+
+            # Set the CurrentCall object to browserstate
+            browser_state.current_call = call_state
+
+            await self._register_audio_track_to_rtc(websocket_id, audio_stream_track) 
 
             if not call_state.audio_port:
-                self._attach_audio_bridge_to_call(call_id)
+                self._attach_audio_bridge_to_call(call_id) # Create track that will emit FROM SIP to Queue
             
             msg = {
                 "type": "call_answered",
@@ -206,14 +212,16 @@ class CallManager:
 
     # Private method to clean up if a browser is removed
     def _handle_browser_leaving_call(self, browser_state: 'BrowserState') -> None:
-        self.logger.debug(f"leaving call internal. current_call_id={browser_state.current_call_id}")
-        if browser_state.current_call_id:
+        cid = browser_state.get_current_call_id()
+        
+        self.logger.debug(f"leaving call internal. current_call_id={cid}")
+        if cid:
             browser_state.rtc_handler.kill_audio_sender()
             # Hang up call
-            call = self.get_call(browser_state.current_call_id)
+            call = self.get_call(cid)
             if call and call.sip_call:
                 call.sip_call.end_call()
         
-        browser_state.current_call_id = None
+        browser_state.deregister_current_call()
 
 global_call_manager = CallManager()

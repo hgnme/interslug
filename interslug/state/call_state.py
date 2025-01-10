@@ -58,15 +58,25 @@ class CallState:
     """
     def __init__(self, sip_call: 'SIPCall'):
         self.sip_call = sip_call  # SIPCall object
-        self.sip_call_info: pj.CallInfo = None
+        self.sip_call_info: pj.CallInfo
+        try:
+            # Set initial call info
+            self.sip_call_info = sip_call.get_info()
+        except:
+            self.sip_call_info = None
+            pass
+        self.call_id: str = self.sip_call_info.callIdString if self.sip_call_info is not None else None
         self.audio_port: SIPAudioBridge = None  # PJSUA2.AudioMediaPort
         self.listeners: dict[str, SIPToBrowserAudioTrack] = {}  # Maps WebSocket ID -> AudioStreamTrack
+
         self.logger = get_logger(f"CallState[{sip_call.getInfo().callIdString}]")
         self.logger.debug("init new CallState")
     
     def update_call_info(self, sip_call_info: 'pj.CallInfo'):
         self.logger.debug(f"update_call_info. state={sip_call_info.stateText}")
         self.sip_call_info = sip_call_info
+        if self.call_id is None:
+            self.call_id = self.sip_call_info.callIdString
     def get_call_info(self):
         return get_sip_call_info(self.sip_call)
 

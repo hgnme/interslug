@@ -135,7 +135,7 @@ class RTCHandler():
             offer = await self.pc.createOffer()
             await self.pc.setLocalDescription(offer)
             ld = {"sdp": self.pc.localDescription.sdp, "type": "offer"}
-            await self.ws_connection.send(message_to_str(ld, "rtc"))
+            await self.ws_connection.send(message_to_str(ld, "RTC"))
             self.negotiation_needed = False
         except Exception as e:
             self.logger.debug(e)

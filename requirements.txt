@@ -9,3 +9,4 @@ websockets
 aiohttp
 aiortc
 numpy
+pyee

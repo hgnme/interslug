@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 import uuid
+from pyee import EventEmitter
 from websockets.asyncio.server import ServerConnection
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCDataChannel, MediaStreamTrack, RTCIceCandidate
 from interslug.messages.message_builder import message_to_str
@@ -32,6 +33,8 @@ class RTCHandler():
         self.pc = RTCPeerConnection()
         self.add_default_listeners()
 
+        self.emitter = EventEmitter()
+
         # Flags for state
         self.ready_to_transmit = False
         self.negotiation_needed = False # LocalDescription has changed. New/Removed track, etc.
@@ -46,6 +49,7 @@ class RTCHandler():
 
     async def on_track(self, track: MediaStreamTrack):
         self.logger.debug(f"Event Trigger [on_Track]. ")
+        self.emitter.emit("incoming_track", track)
         # From here, add the Track to a new class that on recv 
 
     async def on_datachannel(self, channel: RTCDataChannel):

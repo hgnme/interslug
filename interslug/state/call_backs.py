@@ -15,6 +15,7 @@ def cs_cb_on_callstate_call_manager_update(call: 'SIPCall', call_account: 'SIPAc
         l.debug("Call doesn't exist in global_call_manager yet, registering")
         call_state = global_call_manager.add_call(call_info.callIdString, call)
     else: 
+        # Change this to a callstate updater via the manager.
         call_state = global_call_manager.calls[call_info.callIdString]
     
     call_state.update_call_info(call_info)

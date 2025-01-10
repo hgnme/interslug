@@ -1,10 +1,8 @@
 import asyncio
 from dataclasses import dataclass
-import json
 import uuid
 from websockets.asyncio.server import ServerConnection
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCDataChannel, MediaStreamTrack, AudioStreamTrack, RTCConfiguration, RTCIceCandidate
-from interslug.media_cookery.bridges import SIPToBrowserAudioTrack
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCDataChannel, MediaStreamTrack, RTCIceCandidate
 from interslug.messages.message_builder import message_to_str
 from logging_config import get_logger
 
@@ -15,9 +13,8 @@ class IncomingRTCIceCandidate():
     sdpMLineIndex: int
     usernameFragment: str
 
-
-
 def component_str_to_int(component: str):
+    """ WebRTC uses the strings properly. somehow, aiortc is ints?? """
     if component == "rtp":
         return 1
     if component == "rtcp":
@@ -30,17 +27,26 @@ class RTCHandler():
         self.id = f"rtc_{uuid.uuid4()}"
         self.ws_id = ws_connection.id
         self.logger = get_logger(f"rtc-handler-{self.id}")
+        
         self.logger.debug("initialising RTCPeerConnection")
         self.pc = RTCPeerConnection()
-        self.logger.debug("Adding default listeners (loggers)")
         self.add_default_listeners()
-        self.active_call_id: str = None
+
+        # Flags for state
         self.ready_to_transmit = False
-        self.negotiation_needed = False
-        self.watch_negotiation = False
+        self.negotiation_needed = False # LocalDescription has changed. New/Removed track, etc.
+        self.watch_negotiation = False # 
+
+    async def _watch_for_negotiation(self):
+        while self.watch_negotiation: 
+            if self.negotiation_needed:
+                self.pc.emit("negotiationneeded")
+                self.negotiation_needed = False
+            await asyncio.sleep(0.1)
 
     async def on_track(self, track: MediaStreamTrack):
         self.logger.debug(f"Event Trigger [on_Track]. ")
+        # From here, add the Track to a new class that on recv 
 
     async def on_datachannel(self, channel: RTCDataChannel):
         self.logger.debug(f"Event Trigger [on_Channel]. ")
@@ -52,12 +58,6 @@ class RTCHandler():
         new_state = self.pc.iceGatheringState
         self.logger.debug(f"Event Trigger [on_IceGatheringStateChange]. iceGatheringState={new_state}")
 
-    async def watch_for_negotiation(self):
-        while self.watch_negotiation: 
-            if self.negotiation_needed:
-                self.pc.emit("negotiationneeded")
-                self.negotiation_needed = False
-            await asyncio.sleep(0.1)
     async def on_connectionstatechange(self):
         new_state = self.pc.connectionState
         self.watch_negotiation = False
@@ -66,7 +66,7 @@ class RTCHandler():
         if new_state == "connecting" or new_state == "connected" or new_state == "new":
             self.logger.debug("enabling negotitation watch")
             self.watch_negotiation = True
-            asyncio.create_task(self.watch_for_negotiation())
+            asyncio.create_task(self._watch_for_negotiation())
 
     async def on_signalingstatechange(self):
         new_state = self.pc.signalingState
@@ -100,6 +100,7 @@ class RTCHandler():
         self.pc.add_listener("icecandidate", on_icecandidate)
         self.pc.add_listener("icegatheringstatechange", on_icegatheringstatechange)
 
+    
     async def process_offer_and_form_answer(self, message: dict):
         self.logger.debug("Calling setRemoteDescription()")
         await self.pc.setRemoteDescription(RTCSessionDescription(message["sdp"], "offer"))

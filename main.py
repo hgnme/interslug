@@ -7,19 +7,15 @@ from udp_handler import UDPHandler
 from interslug.intercom_handler import IntercomSIPHandler
 from interslug.web_interface import WebInterface, WebInterfaceWrapper
 
-from config import FAKE_ID
+from config import FAKE_ID, SHOULD_RUN_DHCP, SHOULD_RUN_SIP, SHOULD_RUN_UDP_HANDLER, SHOULD_RUN_WEB, SIP_LOCAL_PORT, BIND_IP_ADDRESS, TAILSCALE_BIND_IP_ADDRESS, LOCAL_WEB_BIND_IP_ADDRESS
 
 main_logger = get_logger("main")
 
 def main():
     main_logger.info("Starting main thread")
-    bind_ip_address = "192.168.67.98"
-    bind_ip_address = "192.168.1.185"
-    ts_ip_address = "100.82.195.107"
-    bind_sip_port = 5060
 
-    main_logger.info(f"Creating SIPHandler. ip={bind_ip_address}, port={bind_sip_port}")
-    intercom_sip_handler = IntercomSIPHandler(bind_ip_address, bind_sip_port, FAKE_ID)
+    main_logger.info(f"Creating SIPHandler. ip={BIND_IP_ADDRESS}, port={SIP_LOCAL_PORT}")
+    intercom_sip_handler = IntercomSIPHandler(BIND_IP_ADDRESS, SIP_LOCAL_PORT, FAKE_ID)
 
     main_logger.info(f"Creating UDPHandler")
     udp_handler = UDPHandler()
@@ -35,32 +31,28 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    should_run_udp_handler = False
-    should_run_dhcp = False
-    should_run_sip = True
-    should_run_web = True
 
     try:
-        if should_run_sip:
+        if SHOULD_RUN_SIP:
             # Create SIP thread (which also registers the account)
             main_logger.info(f"Starting thread for SIPHandler")
             sip_thread = threading.Thread(target=intercom_sip_handler.run, name="thread-siphandler", daemon=True)
             sip_thread.start()
 
-        if should_run_udp_handler:
+        if SHOULD_RUN_UDP_HANDLER:
             # Create thread to process incoming packets
             main_logger.info(f"Starting thread for UDPHandler.receive")
             threading.Thread(target=udp_handler.receive, name="thread-udphandler-receive", daemon=True).start()
-        if should_run_dhcp:
+        if SHOULD_RUN_DHCP:
             # Create thread to occasionally transmit DHCP packet
             main_logger.info(f"Starting thread for UDPHandler.periodic_dhcp")
             threading.Thread(target=udp_handler.periodic_dhcp, name="thread-udphandler-periodic_dhcp", daemon=True).start()
-        if should_run_web:
+        if SHOULD_RUN_WEB:
             # Start Flask web listener
-            web_wrapper.run("192.168.1.185", 5000)
-            # web_wrapper.run(ts_ip_address, 5000)
+            web_wrapper.run(LOCAL_WEB_BIND_IP_ADDRESS, 5000)
+            web_wrapper.run(TAILSCALE_BIND_IP_ADDRESS, 5000)
         # threading.Thread(target=web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
-        # threading.Thread(target=web_interface.run, args=(ts_ip_address, 5000), name="thread-web-interface-ts", daemon=True).start()
+        # threading.Thread(target=web_interface.run, args=(TAILSCALE_BIND_IP_ADDRESS, 5000), name="thread-web-interface-ts", daemon=True).start()
         print("Running... Press Ctrl+C to interrupt")
         while not stop_event.is_set():
             time.sleep(1)

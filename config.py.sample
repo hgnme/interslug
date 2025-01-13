@@ -1,13 +1,24 @@
 from logging import INFO, DEBUG, WARN, CRITICAL, ERROR
+import ssl
 from udp_stream_config import UdpStreamConfig
-from interslug.intercom_handler import WallPanel
+from interslug.wall_panel import WallPanel
 # Configuration for UDP communication
 DHCP_PACKET_INTERVAL = 180  # seconds
 FAKE_ID = "x"
 LOG_FILE_NAME = "logs/all_logs.log"
 LOG_LEVEL = DEBUG
+PJSUA_LOG_LEVEL = 1
+
 # SIP Configuration
 SIP_LOCAL_PORT = 5060  # Port where the SIP stack will listen
+BIND_IP_ADDRESS = "192.168.x.x"
+LOCAL_WEB_BIND_IP_ADDRESS = "192.168.x.x"
+TAILSCALE_BIND_IP_ADDRESS = "100.x.x.x"
+
+SHOULD_RUN_UDP_HANDLER = True
+SHOULD_RUN_DHCP = True
+SHOULD_RUN_SIP = True
+SHOULD_RUN_WEB = True
 
 UDP_CAST_CONFIGS = [
     UdpStreamConfig("238.9.9.1", 8400, "intercom_reqs"),
@@ -19,3 +30,11 @@ WALL_PANELS = [
     WallPanel("192.168.100.1", "WALLPANEL_01", "0001", 1),
     WallPanel("192.168.100.2", "WALLPANEL_02", "0002", 1),
 ]
+def get_ssl_context():
+    """ Load the SSL context with the private key and certificate
+    """
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(certfile="ssl/ssl.crt", keyfile="ssl/ssl.key")
+    return context
+
+HGN_SSL_CONTEXT = get_ssl_context()

@@ -88,11 +88,11 @@ class WebInterface:
         for server in self.servers:
             server.shutdown()
      
-def start_webrtc_srv():
+def start_webrtc_srv(host: str):
     logger = get_logger("start_webrtc_srv")
     logger.debug("Calling run_main")
     # This function is called in a separate thread
-    asyncio.run(run_main())
+    asyncio.run(run_main(host))
 
 
 class WebInterfaceWrapper:
@@ -109,7 +109,7 @@ class WebInterfaceWrapper:
         self.logger.info(f"Starting websockets for ip={host} port={8765}")
 
         # thread = threading.Thread(target=_start_server_thread, daemon=True)
-        thread = threading.Thread(target=start_webrtc_srv, daemon=True)
+        thread = threading.Thread(target=start_webrtc_srv, args=[host], daemon=True)
         thread.start()
         self.logger.info(f"Websockets Started")
         self.threads.append(thread)

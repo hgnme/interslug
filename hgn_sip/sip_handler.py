@@ -1,5 +1,6 @@
 import pjsua2 as pj
 import threading
+from config import PJSUA_LOG_LEVEL
 from logging_config import get_logger
 from .sip_account import SIPAccount
 
@@ -15,17 +16,16 @@ class SIPHandler:
 
         self.endpoint = pj.Endpoint()
         self.logger.info(f"Creating new SIPHandler on bind_ip={bind_ip}, bind_port={bind_port}")
-                
+        
         # Initialise Config Objects
         transport_config = pj.TransportConfig()
         log_config = pj.LogConfig()
         ep_config = pj.EpConfig()
 
         # Set up Log Config
-        log_level = 2
-        self.logger.debug(f"Setting PJSUA2 Log level to log_level={log_level}")
-        log_config.level = log_level
-        log_config.consoleLevel = log_level
+        self.logger.debug(f"Setting PJSUA2 Log level to log_level={PJSUA_LOG_LEVEL}")
+        log_config.level = PJSUA_LOG_LEVEL
+        log_config.consoleLevel = PJSUA_LOG_LEVEL
 
         # Attach Log Config to Endpoint Config
         self.logger.debug(f"Attaching LogConfig to EpConfig")
@@ -47,10 +47,11 @@ class SIPHandler:
         
         # Set to Null Audio Device so that the calls don't shit themselves. Ignore incoming audio, and transmit silence.
         adm: pj.AudDevManager = self.endpoint.audDevManager()
-        aud_devs: list[pj.AudioDevInfo] = adm.enumDev2()
-        for dev_info in aud_devs:
-            self.logger.debug(f"Audio device: name={dev_info.name}, driver={dev_info.driver}, input_channels={dev_info.inputCount}, output_channels={dev_info.outputCount}")
-        self.logger.debug("Setting null audio dev")
+        if PJSUA_LOG_LEVEL >= 3:
+            aud_devs: list[pj.AudioDevInfo] = adm.enumDev2()
+            for dev_info in aud_devs:
+                self.logger.debug(f"Audio device: name={dev_info.name}, driver={dev_info.driver}, input_channels={dev_info.inputCount}, output_channels={dev_info.outputCount}")
+            self.logger.debug("Setting null audio dev")
         adm.setNullDev()
 
         # Attach SIP/UDP Transport to Endpoint (with relevant config)

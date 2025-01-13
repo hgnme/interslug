@@ -133,7 +133,7 @@ class DHCPBroadcast:
     def __init__(self, socket: UdpStreamConfig):
         self.logger = get_logger("dhcp_broadcaster")
         self.socket = socket
-        self.mac_address = "dc:a6:32:5b:6f:1f"
+        self.mac_address = "dc:a6:32:5b:6f:1f" # THIS SHOULD BECOME DYNAMIC PLS
         xml = GenericXML("dhcp")
         xml.add_element("event").text = "/discover" # dhcp->event
         xml.add_element("op").text = "req" # dhcp->op

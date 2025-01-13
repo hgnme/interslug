@@ -59,30 +59,19 @@ def trigger_send_unlock_to_wallpanel(target_panel, sip_account: 'SIPAccount'):
     
     sip_account.ep.libRegisterThread("web-thread") # ThreadSaFeTy
 
-    new_call = SIPCall(acc=sip_account, callbacks=sip_account.onCallStateCallbacks)
+    new_call = SIPCall(acc=sip_account, callbacks=sip_account.onCallCallbacks)
     new_call.make_call(dest_wall_panel.sip_uri)
     sip_account.calls.append(new_call)
 
-# List of Callback methods to run, and their call State to run on.
-# These are attached to every call - incoming and outgoing.
-on_call_state_callbacks = [
-    # SIPCallStateCallback("CONFIRMED", cs_cb_send_unlock_on_connected)
-    # SIPCallStateCallback("CONFIRMED", attach_bridge_to_sip_call),
-    # SIPCallStateCallback("CONFIRMED", sip_call_cb_notify_ws),
-    # SIPCallStateCallback("INCOMING", sip_call_cb_notify_ws),
-    # SIPCallStateCallback("DISCONNECTED", sip_call_cb_notify_ws),
-    SIPCallStateCallback("ANY", cs_cb_on_callstate_call_manager_update)
-]
-
 # Callbacks to run when an IM Delivery Status is received to SIPAccount
 on_im_status_callbacks = [
-    # SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
+    SIPInstantMessageStatusStateCallback(im_cb_check_if_message_accepted)
 ]
 call_callbacks = [
     SIPCallCallback("call_state", cs_cb_on_callstate_call_manager_update, on_state_text="ANY"),
-    # SIPCallCallback("call_state", sip_call_cb_notify_ws, "ANY"),
-    SIPCallCallback("call_state", cb_on_endcall_remove_from_call_manager, on_state_text="DISCONNECTED"),
-    SIPCallCallback("end_call", cb_on_endcall_remove_from_call_manager)
+    SIPCallCallback("call_state", cs_cb_send_unlock_on_connected, on_state_text="CONFIRMED"),
+    # SIPCallCallback("call_state", cb_on_endcall_remove_from_call_manager, on_state_text="DISCONNECTED"),
+    SIPCallCallback("end_call", cb_on_endcall_remove_from_call_manager),
 
 ]
 
@@ -95,6 +84,7 @@ class IntercomSIPHandler():
         self.sip_handler.create_endpoint()
         self.sip_handler.register_account(self.sip_identifier)
         self.sip_handler.account.onCallCallbacks = call_callbacks
+        self.sip_handler.account.onInstantMessageCallbacks = on_im_status_callbacks
         while not stop_event.is_set():
             time.sleep(1)
         self.stop()

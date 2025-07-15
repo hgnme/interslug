@@ -72,11 +72,12 @@ class UDPHandler:
                 self.packet_counter += 1
                 try:
                     data, addr = sock.recvfrom(1024)
-                except OSError as e:
+                    source_ip = addr[0]
+                    log_addr = "{0}:{1}".format(addr[0], addr[1])
+                except Exception as e:
+                    self.logger.error(f"UDP Receive error: {e}")
                     self.running = False
                     return
-                source_ip = addr[0]
-                log_addr = "{0}:{1}".format(addr[0], addr[1])
 
                 receiving_socket_name = self.socket_manager.get_receiving_socket_name(sock).name
                 # self.logger.info(f"({self.packet_counter}) Received packet from {log_addr} on from stream {receiving_socket_name}")
@@ -94,5 +95,14 @@ class UDPHandler:
     def stop(self):
         self.running = False
         self.logger.info("Shutting down")
-        for socket in self.socket_manager.sockets:
-            socket.handle.close()
+        for udp_socket in self.socket_manager.sockets:
+            try: 
+                self.logger.info(f"Socket[{udp_socket.name} - {udp_socket.ip}:{udp_socket.port}] Shutting down")
+                udp_socket.handle.shutdown(socket.SHUT_RDWR)
+                self.logger.info(f"Socket[{udp_socket.name} - {udp_socket.ip}:{udp_socket.port}] Shut Down complete")
+            except OSError as e:
+                self.logger.error(e)
+                pass
+            self.logger.info(f"Socket[{udp_socket.name} - {udp_socket.ip}:{udp_socket.port}] Closing")
+            udp_socket.handle.close()
+            self.logger.info(f"Socket[{udp_socket.name} - {udp_socket.ip}:{udp_socket.port}] Closed")

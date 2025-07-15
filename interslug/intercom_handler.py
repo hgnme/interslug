@@ -79,13 +79,20 @@ class IntercomSIPHandler():
     def __init__(self, bind_ip_address: str, bind_sip_port: int, sip_identifier: str):
         self.sip_handler = SIPHandler(bind_ip_address, bind_sip_port)
         self.sip_identifier = sip_identifier
-        
+        self.logger = get_logger("intercom-sip-handler")
+
+    def is_shutdown_event_set(self):
+        is_set = stop_event.is_set()
+        if is_set:
+            self.logger.info(f"IntercomSIPHandler: Shutdown Event detected")
+        return is_set
+
     def run(self):
         self.sip_handler.create_endpoint()
         self.sip_handler.register_account(self.sip_identifier)
         self.sip_handler.account.onCallCallbacks = call_callbacks
         self.sip_handler.account.onInstantMessageCallbacks = on_im_status_callbacks
-        while not stop_event.is_set():
+        while not self.is_shutdown_event_set():
             time.sleep(1)
         self.stop()
 

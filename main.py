@@ -24,7 +24,7 @@ def main():
     web_interface = WebInterface(udp_handler, intercom_sip_handler)
     web_wrapper = WebInterfaceWrapper(web_interface)
     def signal_handler(signum, frame):
-        main_logger.info(f"Signal received, stopping. signum={signum}")
+        main_logger.info(f"STOP SIGNAL RECEIVED. signum={signum}")
         stop_event.set()
 
     # Setup to trigger signal_handler on SIGINT/TERM
@@ -51,16 +51,19 @@ def main():
             # Start Flask web listener
             web_wrapper.run(LOCAL_WEB_BIND_IP_ADDRESS, 5000)
             web_wrapper.run(TAILSCALE_BIND_IP_ADDRESS, 5000)
-        # threading.Thread(target=web_interface.run, args=("192.168.1.185", 5000), name="thread-web-interface", daemon=True).start()
-        # threading.Thread(target=web_interface.run, args=(TAILSCALE_BIND_IP_ADDRESS, 5000), name="thread-web-interface-ts", daemon=True).start()
         print("Running... Press Ctrl+C to interrupt")
         while not stop_event.is_set():
             time.sleep(1)
     except KeyboardInterrupt:
         signal.raise_signal(signal.SIGINT)
     finally:
-        web_wrapper.stop()
+        main_logger.info("Shutting down")
+        main_logger.info("Stopping 'udp_handler'")
         udp_handler.stop()
+        main_logger.info("Stopping 'intercom_sip_handler'")
         intercom_sip_handler.stop()
+        main_logger.info("Stopping 'web_wrapper'")
+        web_wrapper.stop()
+        main_logger.info("Shutdown complete?")
 if __name__ == "__main__":
     main()

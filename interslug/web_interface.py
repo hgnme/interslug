@@ -5,12 +5,13 @@ import websockets
 from flask import Flask, render_template, request, jsonify
 from logging_config import get_logger
 from service_helper import stop_event
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 from .intercom_handler import trigger_send_unlock_to_wallpanel
 from config import WALL_PANELS, HGN_SSL_CONTEXT
 from werkzeug.serving import make_server, BaseWSGIServer
 
-from .web_sip_bridge_rtc import run_main
+from .web_sip_bridge_rtc import start_web_sip_bridge
+
 if TYPE_CHECKING:
     from udp_handler import UDPHandler
     from .intercom_handler import IntercomSIPHandler
@@ -86,20 +87,29 @@ class WebInterface:
         server.serve_forever()
     def shutdown_all(self):
         for server in self.servers:
+            self.logger.info(f"Webserver[{server.host}:{server.port}]: Shutting down")
             server.shutdown()
-     
-def start_webrtc_srv(host: str):
-    logger = get_logger("start_webrtc_srv")
-    logger.debug("Calling run_main")
-    # This function is called in a separate thread
-    asyncio.run(run_main(host))
+            self.logger.info(f"Webserver[{server.host}:{server.port}]: Shutdown complete")
+        self.logger.info("Webservers: Shutdown Complete")
 
+def run_webrtc_srv(host: str):
+    logger = get_logger("run_webrtc_srv")
+    logger.debug("Calling start_web_sip_bridge")
+    try:
+        asyncio.run(start_web_sip_bridge(host))
+    except Exception as e:
+        logger.error(f"WebRTC server error: {e}")
 
 class WebInterfaceWrapper:
     def __init__(self, web_interface: WebInterface):
         self.logger = get_logger("web-interface-wrapper")
         self.web_interface = web_interface
         self.threads: list[threading.Thread] = []
+    def create_and_start_thread(self, in_target: any, in_args=Iterable[any]):
+        new_thread = threading.Thread(target=in_target, args=in_args, daemon=True)
+        self.threads.append(new_thread)
+        new_thread.start()
+
     def run(self, host: str, port: int):
         self.logger.info(f"Starting webserver for ip={host}, port={port}")
         thread = threading.Thread(target=self._run_server, args=(host, port), daemon=True)
@@ -109,7 +119,7 @@ class WebInterfaceWrapper:
         self.logger.info(f"Starting websockets for ip={host} port={8765}")
 
         # thread = threading.Thread(target=_start_server_thread, daemon=True)
-        thread = threading.Thread(target=start_webrtc_srv, args=[host], daemon=True)
+        thread = threading.Thread(target=run_webrtc_srv, args=[host], daemon=True)
         thread.start()
         self.logger.info(f"Websockets Started")
         self.threads.append(thread)
@@ -117,7 +127,17 @@ class WebInterfaceWrapper:
         self.web_interface.run(host=host, port=port)
 
     def stop(self):
-        self.logger.info("Shutting down servers")
+        self.logger.info("Shutting down Webservers")
+        
+        # Shutdown the web interface
+        self.logger.info("Shutdown all on WebInterface (flask)")
         self.web_interface.shutdown_all()
+        
+        # Wait for threads to finish (with timeout to avoid hanging)
         for thread in self.threads:
-            thread.join()  # Ensure that all threads finish before exiting
+            self.logger.info(f"Shutting down thread: [{thread.name}]")
+            thread.join(timeout=5)  # 5 second timeout
+            if thread.is_alive():
+                self.logger.warning(f"Thread [{thread.name}] did not shut down gracefully")
+            else:
+                self.logger.info(f"Shutdown Complete: [{thread.name}]")

@@ -9,10 +9,11 @@ from av.audio.frame import AudioFrame
 
 from hgn_sip.sip_media import get_audio_format
 from logging_config import get_logger
-from .queuing import Q_LIST_TYPE_SIP_TO_BROWSER, get_from_queue, add_frame_to_queue, get_queue_by_id, get_queue_list_by_type
+from .queuing import Q_LIST_TYPE_SIP_TO_BROWSER, Q_LIST_TYPE_BROWSER_TO_SIP, get_from_queue, add_frame_to_queue, get_from_queue_nowait, get_queue_by_id, get_queue_list_by_type
 from .frames import ReturnFrame, create_zero_frame
 
 get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER)
+get_queue_list_by_type(Q_LIST_TYPE_BROWSER_TO_SIP)
 ### NEED TO MANAGE QUEUES SOMEWHERE GLOBALLY
 ### "FRAMEQUEUES"
 
@@ -28,7 +29,8 @@ class SIPAudioBridge(pj.AudioMediaPort):
         self.name: str
         self.call_id = call_id
         self.format: pj.MediaFormatAudio
-        self.queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER),self.call_id)
+        self.incoming_queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_BROWSER_TO_SIP), self.call_id)
+        self.outgoing_queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER), self.call_id)
         self.total_frames = 0
         self.dropped_frames = 0
 
@@ -40,13 +42,17 @@ class SIPAudioBridge(pj.AudioMediaPort):
     def kill(self):
         inf: pj.ConfPortInfo = self.getPortInfo()
         self.__disown__
+    def onFrameRequested(self, frame: pj.MediaFrame):
+        self.logger.debug("frame requested")
+        audio_frame: ReturnFrame = get_from_queue_nowait(self.incoming_queue, self.frametime_sec * 5, 0)
+        # return super().onFrameRequested(frame)
     
     def onFrameReceived(self, frame: pj.MediaFrame):
         """Forward SIP audio to the browser."""
         audio_data = np.frombuffer(bytes(frame.buf), dtype=np.int16) # Convert PJSIP Buffer object to an NP array of signed 16b ints
         self.total_frames += 1
         try:
-            add_frame_to_queue(audio_data, self.queue)
+            add_frame_to_queue(audio_data, self.outgoing_queue)
             # self.logger.debug(f"queued frame. total={self.total_frames}, dropped={self.dropped_frames}")
             # self.queue.put_nowait(audio_data) # add to the queue
         except asyncio.QueueFull:
@@ -122,3 +128,43 @@ class SIPToBrowserAudioTrack(MediaStreamTrack):
         frame.time_base = fractions.Fraction(1, self.format.clockRate) # Time base is 1/samplerathed of a second. e.g. 1/8000 = 0.000125s
         # self.logger.debug(f"received frame. total={self.total_frames}, zero_frames={self.zero_frames}")
         return frame
+
+
+class BrowserToSIPAudioBridge():
+    def __init__(self, stream_queue_id, track: MediaStreamTrack):
+        self.stream_queue_id = stream_queue_id
+        self.logger = get_logger(f'Browser-To-SIP-AudioBridge[{self.stream_queue_id}]')
+        self.queue = get_queue_by_id(get_queue_list_by_type(Q_LIST_TYPE_SIP_TO_BROWSER),stream_queue_id)
+        self.total_frames = 0
+        self.zero_frames = 0
+        self.malformed_frames = 0
+        self.avg_frame_age = 0
+        self.total_wait = 0
+        self.should_receive = True
+
+        self.track = track
+        self.task = asyncio.create_task(self.receive())
+    def kill(self):
+        self.should_receive = False
+        self.track = None
+        try:
+            self.task.cancel() # It's probably already ended because we set should_receive to False
+        except AttributeError:
+            pass
+        self.task = None
+    async def receive(self):
+        while self.should_receive:
+            frame: AudioFrame = await self.track.recv()
+            frame.samples
+            frame.dts
+            frame.format
+            frame.pts
+            frame.rate
+            frame.time_base
+            frame.time
+            frame.sample_rate
+            format = frame.format
+            # Convert audio data to a NumPy array for processing
+            audio_data = frame.to_ndarray()
+            add_frame_to_queue(audio_data, self.queue)
+            self.logger.debug(f"fr: dts={frame.dts}, format={frame.format}, samples={frame.samples}, rate={frame.rate}, time_base={frame.time_base}, time={frame.time}, pts={frame.pts}, sample_rate={frame.sample_rate} ")

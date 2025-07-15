@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from interslug.media_cookery.bridges import BrowserToSIPAudioBridge
+from interslug.media_cookery.bridges import BrowserToSIPAudioBridge, SIPAudioBridge
 from logging_config import get_logger
 
 
@@ -37,7 +37,7 @@ class BrowserState:
         self.current_call_id = None
     def assign_new_rtc_handler(self, rtc_handler: 'RTCHandler'):
         self.rtc_handler = rtc_handler
-        
+
         # assign listeners
         ee = self.rtc_handler.emitter
         ee.on("incoming_track", self.onAudioStreamReceived)
@@ -49,3 +49,18 @@ class BrowserState:
         self.logger.debug("Attaching audio track to new bridge")
         track_listener = BrowserToSIPAudioBridge(queue_id, track)
         self.listeners[queue_id] = track_listener
+        # I also need to create a NEW audio bridge and attach it
+        
+        outgoing_audio_port = SIPAudioBridge(call_id=queue_id) # QUEUE ID IS NOT CALL ID. RENAME THIS
+        outgoing_audio_port.createPort("WebsocketAudioPort", get_audio_format()) # Audio Format is set once
+
+        # GET AUDIO FORMAT ABOVE IS NOT DEFINED. ALSO ITSHOULD PROBABLY BE ABLE TO BE PARAMETERISED, SO THAT IT CAN MANAGE DIFFERENT STREAMS
+        # e.g. incoming audio from browser is prob higher bitrate and sample rate than the SIP call etc...
+
+
+
+
+
+        # YOU WERE CHANGING IT SO THAT THE SIP AUDIOPORTS HAD NOT JUST ONE, BUT INGOING (TO_SIP) AND OUTGOING (FROM_SIP) DIRECTIONS. THESE ARE STORED ON THE CALL AS AUDIO_PORT.
+        # THEN YOU NEED TO CONFIGURE THE PORTS SO THAT THEY CAN BOTH TRANSMIT. BASICALLY, MISSING THE "OUTGOING"'S ON_FRAME_REQUESTED METHOD. 
+        # bUT PROBABLY YOU SHOULD MOVE ALL PORT SHIT TO THE CALL_MANAGER. NOT WITHIN THE BROWSER STATE. IT DOESNT MAKE SENSE.

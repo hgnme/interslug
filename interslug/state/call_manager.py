@@ -149,7 +149,7 @@ class CallManager:
 
             await self._register_audio_track_to_rtc(websocket_id, audio_stream_track) 
 
-            if not call_state.audio_port:
+            if not call_state.audio_ports["from_sip"]:
                 self._attach_audio_bridge_to_call(call_id) # Create track that will emit FROM SIP to Queue
             
             msg = {
@@ -160,7 +160,7 @@ class CallManager:
 
 
     # Handle a browser leaving a call
-    def browser_leave_call(self, websocket_id: str) -> None:
+    def browser_leave_call(self, websocket_id: str):
         self.logger.debug(f"Browser leaving call. websocket_id={websocket_id}")
         # Check Browser is in BrowserList
         if websocket_id not in self.browsers:
@@ -204,7 +204,7 @@ class CallManager:
         call_audio_media.startTransmit(audio_port)
 
         # Attach it to CallState
-        call.audio_port = audio_port
+        call.audio_port["from_sip"] = audio_port
 
     # Private method to add an AudioTrack to an existing RTC connection
     # This will trigger renegotiation

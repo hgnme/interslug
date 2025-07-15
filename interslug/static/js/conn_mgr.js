@@ -64,7 +64,7 @@ export class RTCHandler {
                 sdpMLineIndex: event.candidate.sdpMLineIndex,
                 tcpType: event.candidate.tcpType 
             }
-            sendMessage(this.socket, {type: "icecandidate",candidate: cd_obj}, "rtc")
+            sendMessage(this.socket, {type: "icecandidate",candidate: cd_obj}, "RTC")
         }
         
     }
@@ -108,7 +108,7 @@ export class RTCHandler {
     async sendOffer() {
         const offer = await this.pc.createOffer()
         await this.pc.setLocalDescription(offer)
-        sendMessage(this.socket, {type: "offer", sdp: offer.sdp}, "rtc")
+        sendMessage(this.socket, {type: "offer", sdp: offer.sdp}, "RTC")
     }
     async updateRemoteDescription(msg) {
         const sdp = msg["sdp"]
@@ -126,7 +126,7 @@ export class RTCHandler {
 
         const msg_resp = {type: "answer", sdp: answer.sdp}
         console.log("Sending Offer Response")
-        sendMessage(this.socket, msg_resp, "rtc")
+        sendMessage(this.socket, msg_resp, "RTC")
     }
     async handleIncomingMsg(msg) {
         if (msg.type == "answer") {

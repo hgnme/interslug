@@ -107,6 +107,7 @@ export class SIPHandler {
         // Show answer buttons
     }
     checkHasActiveCalls() {
+        return false; // temporary
         for (const callId in this.calls) {
             if(this.calls[callId].callStateString !== "DISCONNECTED") {
                 return true

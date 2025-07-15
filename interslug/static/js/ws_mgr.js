@@ -27,7 +27,7 @@ export function sendMessage(socket, msg_body, msg_channel, attempts=0) {
 
 export class SocketHandler {
     constructor() {
-        this.ws = new WebSocket("wss://pi4b.localhost.direct:8765");
+        this.ws = new WebSocket(`wss://${window.location.hostname}:8765`);
         this.rtc = new RTCHandler(this.ws);
         this.sip = new SIPHandler(this.ws, this.rtc);
         this.addDefaultListeners();
@@ -36,12 +36,10 @@ export class SocketHandler {
 
         this.ws.addEventListener("message", (ev) => {
             console.log("on-message", ev);
-            console.log("this", this)
             this.processIncomingMessage(ev);
         });
         this.ws.addEventListener("open", (ev) => {
             console.log("on-open", ev);
-            console.log("this", this)
             this.processOnOpen(ev);
         });
     }
@@ -55,13 +53,13 @@ export class SocketHandler {
         const msgBody = JSON.parse(ev.data);
         console.log(`incoming message channel=${msgBody.channel}`, msgBody.message);
         switch (msgBody.channel) {
-            case ("rtc"):
+            case ("RTC"):
                 await this.rtc.handleIncomingMsg(msgBody.message);
                 break;
-            case ("sip"):
+            case ("SIP"):
                 await this.sip.handleIncomingMsg(msgBody.message);
                 break;
-            case ("sys"):
+            case ("SYS"):
                 sendMessage(socket, "pong", "sys")
                 break;
         }

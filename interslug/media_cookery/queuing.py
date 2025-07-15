@@ -51,8 +51,10 @@ def add_frame_to_queue(audio_data, queue: Queue):
         Add a Frame to a given queue with a timestamp to track age
     """
     obj = QueuedFrame(audio_data, len(audio_data), time.time())
-    
-    queue.queue.put_nowait(obj)
+    try:
+        queue.queue.put_nowait(obj)
+    except asyncio.QueueFull:
+        pass
 async def get_from_queue(queue: Queue, max_age: float, expected_sample_size: int):
     """
         Retrieve the first Frame from a given Queue, which is younger than the max_age (in seconds). 
@@ -69,6 +71,29 @@ async def get_from_queue(queue: Queue, max_age: float, expected_sample_size: int
             return return_frame
         else: 
             logger.debug(f"Dropping frame due to excessive age. cutoff={max_age}s, actual={return_frame.age_in_sec}s")
+    
+    # logger.debug(f"Returning zero frame due to empty queue")
+    return create_zero_frame(expected_sample_size)
+        
+def get_from_queue_nowait(queue: Queue, max_age: float, expected_sample_size: int):
+    """
+        Retrieve the first Frame from a given Queue, which is younger than the max_age (in seconds). 
+        If no frame is found, a "Zero" frame is returned in the length provided (expected_sample_size)
+    """
+    logger = get_logger("get_from_queue")
+    now = time.time()
+    while not queue.queue.empty():
+        try:
+            frame: QueuedFrame = queue.queue.get_nowait()
+            return_frame = ReturnFrame(frame.audio_data, frame.samples, frame.timestamp_added)
+            return_frame.age_in_sec = now - return_frame.timestamp_added
+            if return_frame.age_in_sec <= max_age:
+                # Frame is within the cutoff, so it is output
+                return return_frame
+            else: 
+                logger.debug(f"Dropping frame due to excessive age. cutoff={max_age}s, actual={return_frame.age_in_sec}s")
+        except asyncio.QueueEmpty:
+            pass
     
     # logger.debug(f"Returning zero frame due to empty queue")
     return create_zero_frame(expected_sample_size)

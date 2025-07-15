@@ -66,7 +66,7 @@ class CallState:
             self.sip_call_info = None
             pass
         self.call_id: str = self.sip_call_info.callIdString if self.sip_call_info is not None else None
-        self.audio_port: SIPAudioBridge = None  # PJSUA2.AudioMediaPort
+        self.audio_ports: dict[str, SIPAudioBridge] = None  # PJSUA2.AudioMediaPort
         self.listeners: dict[str, SIPToBrowserAudioTrack] = {}  # Maps WebSocket ID -> AudioStreamTrack
 
         self.logger = get_logger(f"CallState[{sip_call.getInfo().callIdString}]")
@@ -82,10 +82,12 @@ class CallState:
 
     # Terminate the call state (clean up audio port and listeners)
     def terminate(self) -> None:
-        if self.audio_port:
-            # TODO: Stop Audio Port
-            self.logger.debug("Deleting audio_port")
-            self.audio_port = None
+        for port_type in self.audio_ports:
+            port = self.audio_ports[port_type]
+            if port:
+                # TODO: Stop Audio Port
+                self.logger.debug(f"Deleting audio_port port_type={port_type}")
+                port = None
         
         # TODO: Terminate all listeners to the AudioPort (self.listeners)
         # for listener_websocket_id, track in self.listeners.items():
